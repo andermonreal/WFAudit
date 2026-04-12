@@ -1,85 +1,45 @@
-"""API routes for WiFi scanning and WPA cracking (aircrack-ng suite)."""
-
 from fastapi import APIRouter, HTTPException
-from app.models.schemas import (
-    WifiScanRequest, HandshakeCaptureRequest,
-    WpaCrackRequest, DeauthRequest,
-)
+from app.models.schemas import WifiScanRequest, HandshakeCaptureRequest, WpaCrackRequest, DeauthRequest
 from app.services.aircrack_service import aircrack_service
 
 router = APIRouter(prefix="/wifi", tags=["WiFi Audit"])
 
-
 @router.post("/scan")
 async def scan_networks(req: WifiScanRequest):
-    """
-    Scan for WiFi networks using airodump-ng.
-    Returns discovered APs with security type, clients, signal strength, etc.
-    Interface MUST be in monitor mode first.
-    """
-    return await aircrack_service.scan_networks(
-        interface=req.interface,
-        channel=req.channel,
-        duration=req.duration,
-        target_bssid=req.target_bssid,
-    )
-
-
-@router.post("/scan/targeted")
-async def targeted_scan(interface: str, bssid: str, channel: int, duration: int = 60):
-    """Focused scan on a single AP."""
-    return await aircrack_service.targeted_scan(interface, bssid, channel, duration)
-
+    """Scan WiFi networks. Supports 2.4 GHz (bg), 5 GHz (a), or dual-band (abg)."""
+    return await aircrack_service.scan_networks(req)
 
 @router.get("/scans")
 async def list_scans():
-    """List all WiFi scan results."""
     return aircrack_service.list_scans()
-
 
 @router.get("/scans/{scan_id}")
 async def get_scan(scan_id: str):
-    """Get a specific scan result."""
-    scan = aircrack_service.get_scan(scan_id)
-    if not scan:
-        raise HTTPException(404, "Scan not found")
-    return scan
-
+    s = aircrack_service.get_scan(scan_id)
+    if not s: raise HTTPException(404, "Scan not found")
+    return s
 
 @router.post("/scans/{scan_id}/stop")
 async def stop_scan(scan_id: str):
-    """Stop a running scan."""
-    success = await aircrack_service.stop_scan(scan_id)
-    return {"stopped": success}
+    return {"stopped": await aircrack_service.stop_scan(scan_id)}
 
+@router.get("/scans/{scan_id}/pnl")
+async def get_pnl_report(scan_id: str):
+    """Analyze Preferred Network Lists from client probes in a scan. Identifies evil twin candidates."""
+    r = await aircrack_service.get_pnl_report(scan_id)
+    if not r: raise HTTPException(404, "Scan not found or not completed")
+    return r
 
 @router.post("/handshake")
 async def capture_handshake(req: HandshakeCaptureRequest):
-    """
-    Capture WPA/WPA2 handshake for offline cracking.
-    Optionally sends deauth packets to force client re-authentication.
-    """
+    """Capture WPA/WPA2 handshake. Supports targeting specific clients and band selection."""
     return await aircrack_service.capture_handshake(req)
-
 
 @router.post("/crack")
 async def crack_wpa(req: WpaCrackRequest):
-    """
-    Attempt to crack a captured WPA handshake using a wordlist.
-    Default wordlist: rockyou.txt
-    """
-    wordlist = req.custom_wordlist_path or req.wordlist
-    return await aircrack_service.crack_wpa(
-        capture_file=req.capture_file,
-        target_bssid=req.target_bssid,
-        wordlist=wordlist,
-    )
-
+    return await aircrack_service.crack_wpa(req.capture_file, req.target_bssid, req.custom_wordlist_path or req.wordlist)
 
 @router.post("/deauth")
 async def send_deauth(req: DeauthRequest):
-    """
-    Send deauthentication packets to disconnect clients.
-    Used to force handshake re-capture or test resilience.
-    """
+    """Send deauth packets. Can target by BSSID or ESSID, broadcast or specific client."""
     return await aircrack_service.send_deauth(req)

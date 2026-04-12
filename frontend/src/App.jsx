@@ -1,761 +1,960 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 
-const API_BASE = "http://localhost:8000";
-async function api(path, opts = {}) {
+const API = "http://localhost:8000";
+const api = async (path, opts = {}) => {
   try {
-    const res = await fetch(`${API_BASE}${path}`, { headers: { "Content-Type": "application/json", ...opts.headers }, ...opts });
-    return await res.json();
+    const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json", ...opts.headers }, ...opts });
+    return await r.json();
   } catch (e) { return { error: e.message }; }
-}
-
-const ThemeCtx = createContext();
-const useTheme = () => useContext(ThemeCtx);
-
-const THEMES = {
-  dark: {
-    name: "dark",
-    bg: "#03060f",
-    bgCard: "rgba(6,14,30,0.85)",
-    bgInput: "rgba(0,229,255,0.04)",
-    bgSidebar: "rgba(3,8,20,0.98)",
-    bgTopbar: "rgba(3,6,15,0.95)",
-    bgHover: "rgba(0,229,255,0.06)",
-    bgTableRow: "rgba(0,229,255,0.025)",
-    text: "#94b8d4",
-    textMuted: "#4a6a82",
-    textDim: "#1e3347",
-    textBright: "#e8f4ff",
-    border: "rgba(0,229,255,0.12)",
-    borderAccent: "rgba(0,229,255,0.25)",
-    borderInput: "rgba(0,229,255,0.2)",
-    accent: "#00e5ff",
-    accentGlow: "rgba(0,229,255,0.3)",
-    accentDim: "rgba(0,229,255,0.15)",
-    green: "#00ffa3",
-    red: "#ff2d55",
-    orange: "#ff6b1a",
-    yellow: "#ffd60a",
-    pink: "#bf5af2",
-    blue: "#0a84ff",
-    violet: "#a855f7",
-    termBg: "rgba(0,8,16,0.95)",
-    termBorder: "rgba(0,255,163,0.2)",
-    termText: "#00ffa3",
-    termPrompt: "#00e5ff",
-    scrollTrack: "transparent",
-    scrollThumb: "rgba(0,229,255,0.2)",
-    cardShadow: "0 0 40px rgba(0,229,255,0.04), inset 0 1px 0 rgba(0,229,255,0.08)",
-    sideText: "#00e5ff",
-    sideTextDim: "#2a4a62",
-    sideActive: "rgba(0,229,255,0.08)",
-    sideActiveBorder: "#00e5ff",
-    sideHover: "#94b8d4",
-    sideClock: "#00e5ff",
-    sideClockDim: "#1e5070",
-    gradStart: "#00e5ff",
-    gradEnd: "#a855f7",
-  },
-  light: {
-    name: "light",
-    bg: "#f0f4f8",
-    bgCard: "rgba(255,255,255,0.9)",
-    bgInput: "rgba(14,52,96,0.04)",
-    bgSidebar: "rgba(10,20,40,0.97)",
-    bgTopbar: "rgba(248,251,255,0.95)",
-    bgHover: "rgba(14,52,96,0.05)",
-    bgTableRow: "rgba(14,52,96,0.025)",
-    text: "#334e68",
-    textMuted: "#627d98",
-    textDim: "#bcccdc",
-    textBright: "#102a43",
-    border: "rgba(14,52,96,0.12)",
-    borderAccent: "rgba(14,52,96,0.2)",
-    borderInput: "rgba(14,52,96,0.2)",
-    accent: "#0077b6",
-    accentGlow: "rgba(0,119,182,0.25)",
-    accentDim: "rgba(0,119,182,0.1)",
-    green: "#00875a",
-    red: "#c0392b",
-    orange: "#d35400",
-    yellow: "#9a7b00",
-    pink: "#7c3aed",
-    blue: "#0060df",
-    violet: "#7c3aed",
-    termBg: "rgba(10,20,40,0.97)",
-    termBorder: "rgba(0,135,90,0.3)",
-    termText: "#00ffa3",
-    termPrompt: "#00e5ff",
-    scrollTrack: "transparent",
-    scrollThumb: "rgba(0,119,182,0.25)",
-    cardShadow: "0 4px 24px rgba(14,52,96,0.08), 0 1px 4px rgba(14,52,96,0.06)",
-    sideText: "#00e5ff",
-    sideTextDim: "rgba(255,255,255,0.35)",
-    sideActive: "rgba(0,229,255,0.12)",
-    sideActiveBorder: "#00e5ff",
-    sideHover: "rgba(255,255,255,0.7)",
-    sideClock: "#00e5ff",
-    sideClockDim: "rgba(255,255,255,0.3)",
-    gradStart: "#0077b6",
-    gradEnd: "#7c3aed",
-  },
 };
 
-const SEV = { critical: "red", high: "orange", medium: "yellow", low: "blue", info: "green" };
-const SEC_COLORS = { open: "red", wep: "orange", wpa: "yellow", wpa2: "blue", wpa3: "green", unknown: "textDim" };
-function tc(t, k) { return t[k] || k; }
+// ═══════════════════════════════════════════
+// THEME SYSTEM
+// ═══════════════════════════════════════════
+const DARK = {
+  bg: "#03070f", bgCard: "rgba(5,12,25,0.92)", bgInput: "#040b18", bgSidebar: "#020408",
+  bgHover: "rgba(0,255,149,0.05)", bgTopbar: "rgba(3,7,16,0.97)",
+  text: "#cdd6e0", textMuted: "#3d5166", textDim: "#162030",
+  border: "#0c1e35", accent: "#00ff95", accentDim: "#00cc78",
+  warn: "#ff9500", danger: "#ff2055", info: "#3ab5ff", purple: "#c084fc",
+  glow: "0 0 24px rgba(0,255,149,0.2)", glowStrong: "0 0 48px rgba(0,255,149,0.35)",
+  glass: "rgba(5,12,25,0.85)", glassBorder: "rgba(0,255,149,0.12)",
+  scanLine: "rgba(0,255,149,0.025)", isDark: true,
+};
+const LIGHT = {
+  bg: "#ebeff8", bgCard: "rgba(255,255,255,0.97)", bgInput: "#f1f5fb", bgSidebar: "#0b1322",
+  bgHover: "rgba(14,165,233,0.06)", bgTopbar: "rgba(255,255,255,0.98)",
+  text: "#1a2740", textMuted: "#5a6e88", textDim: "#9aacbe",
+  border: "#dce4ef", accent: "#0ea5e9", accentDim: "#0284c7",
+  warn: "#f59e0b", danger: "#f43f5e", info: "#6366f1", purple: "#a855f7",
+  glow: "0 4px 24px rgba(14,165,233,0.18)", glowStrong: "0 8px 40px rgba(14,165,233,0.28)",
+  glass: "rgba(255,255,255,0.9)", glassBorder: "rgba(14,165,233,0.18)",
+  scanLine: "rgba(14,165,233,0.015)", isDark: false,
+};
 
-// ═══════ GLOBAL STYLES ═══════
-function GlobalStyles({ t }) {
-  return (
-    <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      body { background: ${t.bg}; }
-      ::-webkit-scrollbar { width: 4px; height: 4px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: ${t.scrollThumb}; border-radius: 2px; }
-      input, select, textarea { font-family: 'Space Mono', monospace !important; }
-      input:focus, select:focus { outline: none; border-color: ${t.accent} !important; box-shadow: 0 0 0 1px ${t.accentDim}, 0 0 16px ${t.accentDim}; }
-      @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-      @keyframes ping { 0%{transform:scale(1);opacity:1} 75%,100%{transform:scale(2);opacity:0} }
-      @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-      @keyframes borderRotate { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-      @keyframes gridScroll { 0%{transform:translateY(0)} 100%{transform:translateY(40px)} }
-      @keyframes glitch1 { 0%,100%{clip-path:inset(0 0 98% 0)} 20%{clip-path:inset(33% 0 60% 0)} 40%{clip-path:inset(70% 0 10% 0)} 60%{clip-path:inset(10% 0 85% 0)} 80%{clip-path:inset(50% 0 40% 0)} }
-      @keyframes glitch2 { 0%,100%{clip-path:inset(0 0 98% 0);transform:translateX(-2px)} 20%{clip-path:inset(80% 0 0% 0);transform:translateX(2px)} 40%{clip-path:inset(20% 0 70% 0);transform:translateX(-1px)} 60%{clip-path:inset(60% 0 30% 0);transform:translateX(2px)} 80%{clip-path:inset(10% 0 80% 0);transform:translateX(-2px)} }
-      .nav-item { transition: all 0.18s cubic-bezier(0.4,0,0.2,1); }
-      .nav-item:hover { background: ${t.sideActive}; }
-      .btn-glow:hover { box-shadow: 0 0 24px var(--btn-glow-color, ${t.accentGlow}); }
-      .card-hover:hover { border-color: ${t.borderAccent}; transform: translateY(-1px); }
-      .tr-hover:hover { background: ${t.bgHover} !important; }
-      .page-content { animation: slideIn 0.25s ease; }
-    `}</style>
-  );
-}
+const ThemeCtx = createContext(DARK);
+const useTheme = () => useContext(ThemeCtx);
 
-// ═══════ BACKGROUND GRID ═══════
-function GridBg({ t }) {
-  if (t.name === "light") return null;
-  return (
-    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
-      <div style={{
-        position: "absolute", inset: "-40px",
-        backgroundImage: `linear-gradient(${t.border} 1px, transparent 1px), linear-gradient(90deg, ${t.border} 1px, transparent 1px)`,
-        backgroundSize: "40px 40px",
-        animation: "gridScroll 8s linear infinite",
-        maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%)",
-        WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%)",
-      }} />
-      <div style={{ position: "absolute", top: "20%", left: "30%", width: 600, height: 600, borderRadius: "50%", background: `radial-gradient(circle, ${t.accentDim} 0%, transparent 70%)`, filter: "blur(60px)", opacity: 0.3 }} />
-      <div style={{ position: "absolute", bottom: "10%", right: "20%", width: 400, height: 400, borderRadius: "50%", background: `radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)`, filter: "blur(60px)", opacity: 0.4 }} />
-    </div>
-  );
-}
+const SEV = { critical: "#ff2055", high: "#ff6b35", medium: "#ff9500", low: "#3ab5ff", info: "#00ff95" };
+const SEC = { open: "#ff2055", wep: "#ff6b35", wpa: "#ff9500", wpa2: "#3ab5ff", wpa3: "#00ff95", wpa2_enterprise: "#c084fc", wpa3_enterprise: "#c084fc", unknown: "#3d5166" };
 
-// ═══════ COMPONENTS ═══════
+const font = "'Space Mono', 'JetBrains Mono', monospace";
+const fontDisplay = "'Orbitron', 'Space Mono', monospace";
 
-function GlitchText({ text, style: sx = {} }) {
-  const t = useTheme();
-  return (
-    <div style={{ position: "relative", display: "inline-block", marginBottom: 24, ...sx }}>
-      <h2 style={{
-        fontFamily: "'Orbitron', sans-serif", fontWeight: 700, fontSize: 15,
-        color: t.accent, letterSpacing: "0.2em", textTransform: "uppercase",
-        textShadow: t.name === "dark" ? `0 0 20px ${t.accentGlow}` : "none",
-      }}>{text}</h2>
-      {t.name === "dark" && <>
-        <h2 aria-hidden style={{ fontFamily: "'Orbitron', sans-serif", fontWeight: 700, fontSize: 15, color: t.violet, letterSpacing: "0.2em", textTransform: "uppercase", position: "absolute", top: 0, left: 0, animation: "glitch1 4s infinite", opacity: 0.5 }}>{text}</h2>
-        <h2 aria-hidden style={{ fontFamily: "'Orbitron', sans-serif", fontWeight: 700, fontSize: 15, color: "#ff2d55", letterSpacing: "0.2em", textTransform: "uppercase", position: "absolute", top: 0, left: 0, animation: "glitch2 4s infinite 0.1s", opacity: 0.4 }}>{text}</h2>
-      </>}
-      <div style={{ position: "absolute", bottom: -6, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, ${t.accent}, ${t.violet}, transparent)` }} />
-    </div>
-  );
-}
+const makeCSS = (C) => `
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;600;700;900&display=swap');
+*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:${C.border} transparent}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:${C.accent}50}
+body,html{margin:0;padding:0}
 
-function TerminalLog({ lines = [], maxH = 200 }) {
-  const t = useTheme(); const ref = useRef(null);
-  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [lines]);
-  return (
-    <div ref={ref} style={{
-      background: t.termBg, border: `1px solid ${t.termBorder}`, borderRadius: 8,
-      padding: "12px 14px", fontFamily: "'Space Mono', monospace", fontSize: 11,
-      color: t.termText, maxHeight: maxH, overflowY: "auto", whiteSpace: "pre-wrap",
-      wordBreak: "break-all", lineHeight: 1.7,
-      boxShadow: `inset 0 0 30px rgba(0,255,163,0.03), 0 0 20px rgba(0,255,163,0.05)`,
-    }}>
-      {lines.length === 0 && <span style={{ color: t.textDim, fontStyle: "italic" }}>// awaiting output...</span>}
-      {lines.map((l, i) => (
-        <div key={i} style={{ marginBottom: 2 }}>
-          <span style={{ color: t.termPrompt, marginRight: 8 }}>❯</span>
-          <span>{l}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes pulseRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.5);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes spinSlow{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideLeft{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+@keyframes scanH{0%{left:-60%}100%{left:120%}}
+@keyframes scanV{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 8px ${C.accent}30}50%{box-shadow:0 0 32px ${C.accent}60,0 0 64px ${C.accent}20}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes shimmer{0%{background-position:-300% center}100%{background-position:300% center}}
+@keyframes loadBar{0%{width:0%;opacity:1}70%{width:85%;opacity:1}100%{width:100%;opacity:0}}
+@keyframes countUp{from{opacity:0;transform:translateY(12px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes borderFlicker{0%,100%{border-color:${C.accent}18}50%{border-color:${C.accent}50}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes rotateBorder{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4)}}
 
-function Badge({ children, color = "accent", small = false }) {
-  const t = useTheme(); const c = tc(t, color);
+.anim-up{animation:slideUp .4s cubic-bezier(.22,1,.36,1) both}
+.anim-left{animation:slideLeft .35s cubic-bezier(.22,1,.36,1) both}
+.anim-fade{animation:fadeIn .3s ease both}
+.anim-count{animation:countUp .5s cubic-bezier(.22,1,.36,1) both}
+.page-in{animation:pageIn .4s cubic-bezier(.22,1,.36,1) both}
+
+.nav-item{transition:all .18s cubic-bezier(.22,1,.36,1)}
+.nav-item:hover .nav-label{letter-spacing:.14em!important}
+.nav-item:hover .nav-icon{transform:scale(1.2)}
+
+.card-hover{transition:transform .2s ease,box-shadow .2s ease}
+.card-hover:hover{transform:translateY(-1px)}
+
+.btn-base{position:relative;overflow:hidden;transition:all .18s cubic-bezier(.22,1,.36,1)!important}
+.btn-base::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);transform:translateX(-100%);transition:transform .4s ease}
+.btn-base:hover::before{transform:translateX(100%)}
+.btn-base:active{transform:scale(.97)!important}
+
+input:focus,select:focus{outline:none}
+`;
+
+// ═══════════════════════════════════════════
+// SHARED COMPONENTS
+// ═══════════════════════════════════════════
+const Badge = ({ children, color, sm }) => {
+  const C = useTheme();
+  const c = color || C.accent;
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: small ? "2px 7px" : "3px 10px",
-      borderRadius: 4, background: c + "18", color: c,
-      border: `1px solid ${c}30`,
-      fontSize: small ? 9 : 10, fontFamily: "'Space Mono', monospace",
-      textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700,
-    }}>
-      {children}
-    </span>
+      display:"inline-flex", alignItems:"center",
+      padding: sm ? "1px 8px" : "3px 10px",
+      borderRadius: 2, background: `${c}14`, color: c,
+      border: `1px solid ${c}35`, fontSize: sm ? 9 : 10,
+      fontFamily: font, textTransform:"uppercase", letterSpacing:".1em", fontWeight:700,
+    }}>{children}</span>
   );
-}
+};
 
-function StatusDot({ color = "green" }) {
-  const t = useTheme(); const c = tc(t, color);
+const Spinner = ({ size = 16, color }) => {
+  const C = useTheme();
+  const c = color || C.accent;
   return (
-    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 10, height: 10 }}>
-      <span style={{ position: "absolute", width: 10, height: 10, borderRadius: "50%", background: c, opacity: 0.3, animation: "ping 1.5s ease-in-out infinite" }} />
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c, boxShadow: `0 0 6px ${c}` }} />
-    </span>
+    <span style={{
+      display:"inline-block", width: size, height: size,
+      border: `2px solid ${c}18`,
+      borderTopColor: c, borderRightColor: `${c}70`,
+      borderRadius:"50%", animation:"spin .65s linear infinite", flexShrink:0,
+    }} />
   );
-}
+};
 
-function Btn({ children, onClick, color = "accent", disabled = false, small = false, danger = false, style: sx = {} }) {
-  const t = useTheme();
-  const c = tc(t, danger ? "red" : color);
-  const [hov, setHov] = useState(false);
+const LoadingOverlay = ({ message = "Processing...", duration = 0 }) => {
+  const C = useTheme();
+  const [dots, setDots] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startTime = useRef(Date.now());
+  useEffect(() => {
+    startTime.current = Date.now();
+    const di = setInterval(() => setDots(d => d.length >= 3 ? "" : d + "."), 420);
+    const pi = setInterval(() => {
+      const el = (Date.now() - startTime.current) / 1000;
+      setElapsed(el);
+      if (duration > 0) {
+        setProgress(Math.min(99, (el / duration) * 100));
+      } else {
+        setProgress(p => p >= 95 ? 95 : p + 0.5);
+      }
+    }, 100);
+    return () => { clearInterval(di); clearInterval(pi); };
+  }, [duration]);
+  return (
+    <div style={{
+      display:"flex", flexDirection:"column", alignItems:"center",
+      justifyContent:"center", padding:"64px 40px", position:"relative", overflow:"hidden",
+    }}>
+      {/* Scan line */}
+      <div style={{
+        position:"absolute", left:0, right:0, height:1,
+        background:`linear-gradient(90deg,transparent,${C.accent}60,transparent)`,
+        animation:"scanV 2.5s linear infinite", pointerEvents:"none", top:0,
+      }} />
+      {/* Rings */}
+      <div style={{ position:"relative", width:88, height:88, marginBottom:28, flexShrink:0 }}>
+        {[0,1,2].map(i => (
+          <div key={i} style={{
+            position:"absolute",
+            inset: i * 12, borderRadius:"50%",
+            border: `1px solid ${C.accent}${["40","28","18"][i]}`,
+            animation:`pulseRing ${1.4 + i * .4}s ease-out infinite ${i * .35}s`,
+          }} />
+        ))}
+        <div style={{
+          position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
+        }}>
+          <div style={{
+            width:36, height:36, borderRadius:"50%",
+            border:`2px solid ${C.accent}25`,
+            borderTopColor: C.accent, borderRightColor:`${C.accent}80`,
+            animation:"spin .55s linear infinite",
+          }} />
+        </div>
+        <div style={{
+          position:"absolute", inset:6, borderRadius:"50%",
+          border:`1px solid ${C.accent}15`,
+          borderBottomColor: C.accent,
+          animation:"spin 1.4s linear infinite reverse",
+        }} />
+      </div>
+      {/* Progress bar */}
+      <div style={{
+        width:220, height:2, background:`${C.accent}15`, borderRadius:2, marginBottom:18, overflow:"hidden",
+      }}>
+        <div style={{
+          height:"100%", borderRadius:2,
+          background:`linear-gradient(90deg,${C.accent}80,${C.accent},${C.accent}80)`,
+          backgroundSize:"200% auto", animation:"shimmer 1.2s linear infinite",
+          width:`${progress}%`, transition:"width .06s linear",
+          boxShadow:`0 0 8px ${C.accent}`,
+        }} />
+      </div>
+      <div style={{ fontFamily:font, fontSize:10, color:C.accent, letterSpacing:".25em", textTransform:"uppercase" }}>
+        {message}{dots}
+      </div>
+      <div style={{ marginTop:8, fontFamily:font, fontSize:9, color:C.textMuted, letterSpacing:".1em" }}>
+        {Math.round(progress)}%{duration > 0 ? ` · ${Math.round(elapsed)}s / ${duration}s` : ` · ${Math.round(elapsed)}s elapsed`}
+      </div>
+    </div>
+  );
+};
+
+const Btn = ({ children, onClick, color, disabled, sm, danger, ghost, sx = {} }) => {
+  const C = useTheme();
+  const c = danger ? C.danger : (color || C.accent);
+  const [h, setH] = useState(false);
+  const [active, setActive] = useState(false);
   return (
     <button
-      onClick={onClick} disabled={disabled}
-      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      className="btn-glow"
+      className="btn-base"
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => { setH(false); setActive(false); }}
+      onMouseDown={() => setActive(true)}
+      onMouseUp={() => setActive(false)}
       style={{
-        "--btn-glow-color": c + "44",
-        padding: small ? "5px 12px" : "9px 20px",
-        background: disabled ? "rgba(255,255,255,0.03)" : hov ? c + "22" : c + "12",
-        color: disabled ? t.textDim : c,
-        border: `1px solid ${disabled ? t.border : c + "50"}`,
-        borderRadius: 6, cursor: disabled ? "not-allowed" : "pointer",
-        fontFamily: "'Space Mono', monospace", fontSize: small ? 10 : 11,
-        letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700,
-        transition: "all 0.18s ease", display: "inline-flex", alignItems: "center", gap: 6,
-        ...sx
+        padding: sm ? "4px 12px" : "8px 18px",
+        background: ghost ? "transparent"
+          : disabled ? `${C.textDim}20`
+          : h ? `${c}22` : `${c}12`,
+        color: disabled ? C.textMuted : c,
+        border: `1px solid ${disabled ? C.textDim + "20" : h ? c + "70" : c + "38"}`,
+        borderRadius: 3, cursor: disabled ? "not-allowed" : "pointer",
+        fontFamily: font, fontSize: sm ? 10 : 12,
+        letterSpacing:".08em", textTransform:"uppercase", fontWeight:700,
+        display:"inline-flex", alignItems:"center", gap:6,
+        boxShadow: h && !disabled ? `0 0 18px ${c}25, inset 0 0 12px ${c}08` : "none",
+        transform: active ? "scale(.96)" : "scale(1)",
+        ...sx,
       }}
     >{children}</button>
   );
-}
+};
 
-function Input({ label, value, onChange, placeholder, type = "text", style: sx = {} }) {
-  const t = useTheme();
+const Input = ({ label, value, onChange, placeholder, type = "text", sx = {} }) => {
+  const C = useTheme();
+  const [focused, setFocused] = useState(false);
   return (
-    <div style={{ marginBottom: 12, ...sx }}>
+    <div style={{ marginBottom:8, ...sx }}>
       {label && (
         <label style={{
-          display: "block", fontSize: 9, color: t.accent, textTransform: "uppercase",
-          letterSpacing: "0.15em", marginBottom: 5, fontFamily: "'Orbitron', sans-serif", fontWeight: 700,
+          display:"block", fontSize:9, color: focused ? C.accent : C.textMuted,
+          textTransform:"uppercase", letterSpacing:".14em", marginBottom:4,
+          fontFamily:font, fontWeight:700, transition:"color .15s",
         }}>{label}</label>
       )}
       <input
         type={type} value={value}
-        onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{
-          width: "100%", padding: "8px 12px",
-          background: t.bgInput, border: `1px solid ${t.borderInput}`,
-          borderRadius: 6, color: t.textBright, fontFamily: "'Space Mono', monospace",
-          fontSize: 11, transition: "all 0.18s ease",
+          width:"100%", padding:"7px 11px",
+          background: focused ? `${C.accent}06` : C.bgInput,
+          border: `1px solid ${focused ? C.accent + "60" : C.border}`,
+          borderRadius:3, color:C.text,
+          fontFamily:font, fontSize:12, outline:"none", transition:"all .18s",
+          boxShadow: focused ? `0 0 0 3px ${C.accent}12, 0 0 16px ${C.accent}10` : "none",
         }}
       />
     </div>
   );
-}
+};
 
-function Select({ label, value, onChange, options }) {
-  const t = useTheme();
+const Select = ({ label, value, onChange, options }) => {
+  const C = useTheme();
+  const [focused, setFocused] = useState(false);
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom:8 }}>
       {label && (
         <label style={{
-          display: "block", fontSize: 9, color: t.accent, textTransform: "uppercase",
-          letterSpacing: "0.15em", marginBottom: 5, fontFamily: "'Orbitron', sans-serif", fontWeight: 700,
+          display:"block", fontSize:9, color: focused ? C.accent : C.textMuted,
+          textTransform:"uppercase", letterSpacing:".14em", marginBottom:4,
+          fontFamily:font, fontWeight:700, transition:"color .15s",
         }}>{label}</label>
       )}
       <select
-        value={value} onChange={(e) => onChange(e.target.value)}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{
-          width: "100%", padding: "8px 12px",
-          background: t.bgInput, border: `1px solid ${t.borderInput}`,
-          borderRadius: 6, color: t.textBright, fontFamily: "'Space Mono', monospace",
-          fontSize: 11,
+          width:"100%", padding:"7px 11px",
+          background: C.bgInput, border:`1px solid ${focused ? C.accent + "60" : C.border}`,
+          borderRadius:3, color:C.text, fontFamily:font, fontSize:11, outline:"none",
+          cursor:"pointer", transition:"all .18s",
+          boxShadow: focused ? `0 0 0 3px ${C.accent}12` : "none",
         }}
       >
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {options.map(o => (
+          <option key={o.value} value={o.value} style={{ background: C.bgInput }}>{o.label}</option>
+        ))}
       </select>
     </div>
   );
-}
+};
 
-function Card({ title, children, color = "accent", style: sx = {} }) {
-  const t = useTheme(); const c = tc(t, color);
+const Card = ({ title, children, color, accent, sx = {}, className="" }) => {
+  const C = useTheme();
+  const c = color || C.accent;
   return (
-    <div className="card-hover" style={{
-      background: t.bgCard, border: `1px solid ${c}20`,
-      borderRadius: 10, padding: "16px 18px", marginBottom: 14,
-      borderLeft: `2px solid ${c}`,
-      boxShadow: t.cardShadow,
-      backdropFilter: t.name === "dark" ? "blur(20px)" : "none",
-      WebkitBackdropFilter: t.name === "dark" ? "blur(20px)" : "none",
-      transition: "all 0.2s ease",
-      ...sx
-    }}>
+    <div
+      className={`anim-up card-hover ${className}`}
+      style={{
+        background: C.bgCard, borderRadius:6, padding:16, marginBottom:12,
+        border: `1px solid ${c}18`,
+        borderLeft: `2px solid ${c}70`,
+        position:"relative", overflow:"hidden",
+        backdropFilter:"blur(12px)",
+        boxShadow: `0 4px 24px ${C.isDark ? "rgba(0,0,0,.5)" : "rgba(0,0,0,.08)"}, inset 0 1px 0 ${c}10`,
+        ...sx,
+      }}
+    >
+      {/* Top-right corner glow */}
+      {accent && (
+        <div style={{
+          position:"absolute", top:0, right:0, width:80, height:80,
+          background: `radial-gradient(circle at top right, ${c}10, transparent 70%)`,
+          pointerEvents:"none",
+        }} />
+      )}
+      {/* Scan line effect */}
+      <div style={{
+        position:"absolute", top:0, left:0, right:0, height:1,
+        background:`linear-gradient(90deg,transparent,${c}30,transparent)`,
+        pointerEvents:"none",
+      }} />
       {title && (
         <div style={{
-          fontSize: 9, color: c, textTransform: "uppercase", letterSpacing: "0.18em",
-          marginBottom: 14, fontFamily: "'Orbitron', sans-serif", fontWeight: 700,
-          borderBottom: `1px solid ${c}15`, paddingBottom: 8,
-          display: "flex", alignItems: "center", gap: 8,
+          fontSize:10, color:c, textTransform:"uppercase",
+          letterSpacing:".16em", marginBottom:10, fontFamily:fontDisplay,
+          fontWeight:700, display:"flex", alignItems:"center", gap:8,
         }}>
-          <div style={{ width: 3, height: 3, borderRadius: "50%", background: c, boxShadow: `0 0 6px ${c}` }} />
+          <span style={{
+            width:5, height:5, background:c, borderRadius:"50%",
+            boxShadow:`0 0 8px ${c}, 0 0 16px ${c}60`,
+            flexShrink:0, display:"block",
+            animation:"dotPulse 2s ease-in-out infinite",
+          }} />
           {title}
         </div>
       )}
       {children}
     </div>
   );
-}
+};
 
-function DataTable({ columns, data, onRowClick }) {
-  const t = useTheme();
+const Stat = ({ label, value, color, icon }) => {
+  const C = useTheme();
+  const c = color || C.accent;
   return (
-    <div style={{ overflowX: "auto", borderRadius: 6, border: `1px solid ${t.border}` }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Space Mono', monospace", fontSize: 11 }}>
+    <div className="anim-count card-hover" style={{
+      background: C.bgCard, border:`1px solid ${c}20`,
+      borderRadius:6, padding:"12px 16px", minWidth:90, flex:1,
+      position:"relative", overflow:"hidden",
+      boxShadow:`0 4px 20px ${C.isDark ? "rgba(0,0,0,.4)" : "rgba(0,0,0,.06)"}`,
+      backdropFilter:"blur(8px)",
+    }}>
+      <div style={{
+        position:"absolute", bottom:0, right:0, width:60, height:60,
+        background:`radial-gradient(circle at bottom right, ${c}12, transparent 70%)`,
+        pointerEvents:"none",
+      }} />
+      <div style={{
+        fontSize:10, color:C.textMuted, textTransform:"uppercase",
+        letterSpacing:".12em", fontFamily:font, marginBottom:6, display:"flex", alignItems:"center", gap:5,
+      }}>
+        <span>{icon}</span>{label}
+      </div>
+      <div style={{
+        fontSize:24, color:c, fontFamily:fontDisplay, fontWeight:700,
+        textShadow:`0 0 20px ${c}50`,
+      }}>{value}</div>
+    </div>
+  );
+};
+
+const Log = ({ lines = [], maxH = 180 }) => {
+  const C = useTheme();
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [lines]);
+  return (
+    <div ref={ref} style={{
+      background: C.isDark ? "#02060e" : "#f8fafc",
+      border:`1px solid ${C.border}`,
+      borderRadius:4, padding:"10px 12px",
+      fontFamily:font, fontSize:10, color:C.accent,
+      maxHeight:maxH, overflowY:"auto",
+      whiteSpace:"pre-wrap", wordBreak:"break-all", lineHeight:1.7,
+      boxShadow:`inset 0 2px 8px ${C.isDark ? "rgba(0,0,0,.6)" : "rgba(0,0,0,.04)"}`,
+    }}>
+      {lines.length === 0 && (
+        <span style={{ color:C.textMuted }}>
+          <span style={{ animation:"blink 1s step-end infinite", display:"inline-block" }}>▋</span>
+          {" "}Awaiting output...
+        </span>
+      )}
+      {lines.map((l, i) => {
+        let isJson = false;
+        let formatted = l;
+        try {
+          if (l.trim().startsWith("{") || l.trim().startsWith("[")) {
+            const parsed = JSON.parse(l);
+            formatted = JSON.stringify(parsed, null, 2);
+            isJson = true;
+          }
+        } catch(e) {}
+        return (
+          <div key={i} className="anim-fade" style={{ display:"flex", gap:8, marginBottom: isJson ? 6 : 0 }}>
+            <span style={{ color:`${C.accent}50`, flexShrink:0 }}>›</span>
+            {isJson ? (
+              <pre style={{ margin:0, padding:"6px 10px", background:`${C.accent}05`, borderRadius:3, border:`1px solid ${C.border}`, fontSize:10, color:C.info, overflowX:"auto", maxWidth:"100%", lineHeight:1.5 }}>
+                {formatted}
+              </pre>
+            ) : (
+              <span style={{ color: l.includes("error") || l.includes("Error") || l.includes("fail") ? C.danger : l.includes("success") || l.includes("✓") ? C.accent : C.text }}>{l}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const Table = ({ cols, data, onRow }) => {
+  const C = useTheme();
+  return (
+    <div style={{ overflowX:"auto", borderRadius:4 }}>
+      <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:font, fontSize:12 }}>
         <thead>
-          <tr style={{ background: t.bgHover }}>
-            {columns.map((c) => (
+          <tr style={{ background:`${C.accent}08` }}>
+            {cols.map(c => (
               <th key={c.key} style={{
-                textAlign: "left", padding: "8px 12px", color: t.accent,
-                fontSize: 9, textTransform: "uppercase", letterSpacing: "0.15em",
-                fontFamily: "'Orbitron', sans-serif", fontWeight: 700,
-                borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap",
+                textAlign:"left", padding:"8px 10px", color:C.accent,
+                borderBottom:`1px solid ${C.border}`,
+                fontSize:10, textTransform:"uppercase", letterSpacing:".12em",
+                whiteSpace:"nowrap", fontWeight:700, fontFamily:fontDisplay,
               }}>{c.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
-            <tr
-              key={i} className="tr-hover"
-              onClick={() => onRowClick?.(row)}
-              style={{ cursor: onRowClick ? "pointer" : "default", borderBottom: `1px solid ${t.border}`, transition: "background 0.15s" }}
+          {data.map((r, i) => (
+            <tr key={i} onClick={() => onRow?.(r)}
+              style={{
+                cursor: onRow ? "pointer" : "default",
+                borderBottom:`1px solid ${C.border}40`,
+                transition:"all .15s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = C.bgHover;
+                if (onRow) e.currentTarget.style.boxShadow = `inset 2px 0 0 ${C.accent}`;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             >
-              {columns.map((c) => (
-                <td key={c.key} style={{ padding: "7px 12px", color: t.text, whiteSpace: "nowrap" }}>
-                  {c.render ? c.render(row[c.key], row) : row[c.key]}
+              {cols.map(c => (
+                <td key={c.key} style={{ padding:"7px 10px", color:C.text, whiteSpace:"nowrap" }}>
+                  {c.render ? c.render(r[c.key], r) : r[c.key]}
                 </td>
               ))}
             </tr>
           ))}
           {data.length === 0 && (
             <tr>
-              <td colSpan={columns.length} style={{ padding: 32, textAlign: "center", color: t.textDim, fontStyle: "italic" }}>
-                // no data available
-              </td>
+              <td colSpan={cols.length} style={{
+                padding:28, textAlign:"center", color:C.textMuted,
+                fontStyle:"italic",
+              }}>No data available</td>
             </tr>
           )}
         </tbody>
       </table>
     </div>
   );
-}
+};
 
-function Stat({ label, value, color = "accent", icon }) {
-  const t = useTheme(); const c = tc(t, color);
+const PageTitle = ({ children, sub }) => {
+  const C = useTheme();
   return (
-    <div style={{
-      background: t.bgCard, border: `1px solid ${c}25`,
-      borderRadius: 10, padding: "14px 18px", minWidth: 110, flex: 1,
-      boxShadow: t.cardShadow, position: "relative", overflow: "hidden",
-      backdropFilter: t.name === "dark" ? "blur(20px)" : "none",
-    }}>
-      <div style={{
-        position: "absolute", top: 0, right: 0, width: 60, height: 60,
-        background: `radial-gradient(circle at top right, ${c}15, transparent 70%)`,
-        borderRadius: "0 10px 0 60px",
-      }} />
-      <div style={{ fontSize: 9, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.15em", fontFamily: "'Orbitron', sans-serif", fontWeight: 700, marginBottom: 8 }}>
-        {icon && <span style={{ marginRight: 6, fontSize: 12 }}>{icon}</span>}{label}
+    <div style={{ marginBottom:24 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:4 }}>
+        <div style={{ width:3, height:22, background:C.accent, borderRadius:2, boxShadow:`0 0 10px ${C.accent}` }} />
+        <h2 style={{
+          fontFamily:fontDisplay, color:C.accent, fontSize:18, fontWeight:700,
+          margin:0, letterSpacing:".12em", textTransform:"uppercase",
+          textShadow:`0 0 20px ${C.accent}40`,
+        }}>{children}</h2>
       </div>
-      <div style={{ fontSize: 24, color: c, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, textShadow: t.name === "dark" ? `0 0 20px ${c}66` : "none" }}>{value}</div>
+      {sub && (
+        <div style={{ fontSize:11, color:C.textMuted, fontFamily:font, marginTop:3, paddingLeft:13 }}>
+          {sub}
+        </div>
+      )}
     </div>
   );
-}
+};
 
-function Chk({ label, checked, onChange }) {
-  const t = useTheme();
-  return (
-    <label style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.textMuted, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-      <div style={{
-        width: 16, height: 16, borderRadius: 4, border: `1px solid ${checked ? t.accent : t.border}`,
-        background: checked ? t.accent + "20" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-        transition: "all 0.15s", flexShrink: 0,
-      }}>
-        {checked && <div style={{ width: 8, height: 8, borderRadius: 2, background: t.accent }} />}
-      </div>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ display: "none" }} />
-      {label}
-    </label>
-  );
-}
+const Grid = ({ cols = 2, gap = 12, children }) => (
+  <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols}, 1fr)`, gap }}>{children}</div>
+);
+const Row = ({ gap = 8, wrap, children, sx = {} }) => (
+  <div style={{ display:"flex", gap, flexWrap:wrap ? "wrap" : "nowrap", ...sx }}>{children}</div>
+);
 
-// ═══════ PAGES ═══════
-
+// ═══════════════════════════════════════════
+// PAGE: DASHBOARD
+// ═══════════════════════════════════════════
 function DashboardPage() {
-  const t = useTheme();
-  const [pf, setPf] = useState(null); const [ld, setLd] = useState(false);
+  const C = useTheme();
+  const [pf, setPf] = useState(null);
+  const [ld, setLd] = useState(false);
   const run = async () => { setLd(true); setPf(await api("/system/preflight")); setLd(false); };
   useEffect(() => { run(); }, []);
-  const tools = pf?.tools || {}; const inst = Object.values(tools).filter(x => x.installed).length; const tot = Object.keys(tools).length;
+  const t = pf?.tools || {};
+  const inst = Object.values(t).filter(x => x.installed).length;
+  const tot = Object.keys(t).length;
+  if (ld) return <LoadingOverlay message="Running system preflight checks" />;
   return (
-    <div className="page-content">
-      <GlitchText text="// SYSTEM OVERVIEW" />
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <Stat label="Status" value={pf?.ready ? "READY" : "OFFLINE"} color={pf?.ready ? "green" : "red"} icon="◉" />
-        <Stat label="Root Access" value={pf?.system?.is_root ? "YES" : "NO"} color={pf?.system?.is_root ? "green" : "red"} icon="⚡" />
-        <Stat label="Tools" value={`${inst}/${tot}`} color={inst === tot ? "green" : "yellow"} icon="⚙" />
-        <Stat label="OS" value={pf?.system?.release?.slice(0, 14) || "—"} color="accent" icon="▣" />
+    <div className="page-in">
+      <PageTitle sub="System health, tools inventory, and environment verification">System Overview</PageTitle>
+      {/* Hero status */}
+      <div className="anim-up" style={{ padding:"20px 24px", marginBottom:16, borderRadius:8, background: pf?.ready ? `${C.accent}06` : `${C.danger}08`, border:`1px solid ${pf?.ready ? C.accent : C.danger}25`, position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:`linear-gradient(90deg, transparent, ${pf?.ready ? C.accent : C.danger}60, transparent)` }} />
+        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{ width:48, height:48, borderRadius:"50%", background:`${pf?.ready ? C.accent : C.danger}15`, border:`2px solid ${pf?.ready ? C.accent : C.danger}40`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, animation: pf?.ready ? "none" : "pulse 1.5s infinite" }}>
+            {pf?.ready ? "✓" : "!"}
+          </div>
+          <div>
+            <div style={{ fontFamily:fontDisplay, fontSize:20, fontWeight:900, color: pf?.ready ? C.accent : C.danger, letterSpacing:".1em", textShadow:`0 0 20px ${pf?.ready ? C.accent : C.danger}50` }}>
+              {pf?.ready ? "SYSTEM READY" : "SYSTEM NOT READY"}
+            </div>
+            <div style={{ fontFamily:font, fontSize:11, color:C.textMuted, marginTop:2 }}>
+              {pf?.system?.distro || "Unknown OS"} · Python {pf?.system?.python || "?"} · {pf?.system?.is_root ? "Running as root ✓" : "NOT running as root ✗"}
+            </div>
+          </div>
+        </div>
       </div>
+      <Row gap={10} wrap>
+        {[
+          ["STATUS", pf?.ready ? "READY" : "NOT READY", pf?.ready ? C.accent : C.danger, "◉"],
+          ["ROOT", pf?.system?.is_root ? "YES" : "NO", pf?.system?.is_root ? C.accent : C.danger, "⚡"],
+          ["TOOLS", `${inst}/${tot}`, inst === tot ? C.accent : C.warn, "⚙"],
+          ["DISTRO", pf?.system?.distro?.slice(0, 20) || "—", C.info, "▣"],
+        ].map(([l, v, c, i]) => <Stat key={l} label={l} value={v} color={c} icon={i} />)}
+      </Row>
       {pf?.missing_critical?.length > 0 && (
-        <Card title="Missing Critical Tools" color="red">
+        <Card title="Missing Critical Tools" color={C.danger} accent>
           {pf.missing_critical.map(x => (
-            <div key={x} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 10px", background: "rgba(255,45,85,0.05)", borderRadius: 6, marginBottom: 6, fontFamily: "'Space Mono', monospace", fontSize: 11 }}>
-              <span style={{ color: t.red }}>✗</span>
-              <span style={{ color: t.textBright }}>{x}</span>
-              <span style={{ color: t.textMuted }}>→</span>
-              <code style={{ color: t.yellow, background: "rgba(255,214,10,0.08)", padding: "2px 8px", borderRadius: 4 }}>apt install {tools[x]?.package}</code>
+            <div key={x} style={{ color:C.danger, fontSize:11, fontFamily:font, marginBottom:4, display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ color:C.danger }}>✗</span>
+              <span style={{ color:C.text }}>{x}</span>
+              <span style={{ color:C.warn }}>sudo apt install {t[x]?.package}</span>
             </div>
           ))}
         </Card>
       )}
-      <Card title="Tool Status">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
-          {Object.entries(tools).map(([n, info]) => (
+      <Card title="Tool Inventory" accent>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px,1fr))", gap:6 }}>
+          {Object.entries(t).map(([n, info]) => (
             <div key={n} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "8px 12px", background: t.bgTableRow, borderRadius: 6,
-              border: `1px solid ${info.installed ? t.green + "20" : t.red + "20"}`,
+              display:"flex", justifyContent:"space-between", alignItems:"center",
+              padding:"6px 10px", background:C.bgInput, borderRadius:3,
+              border:`1px solid ${info.installed ? C.accent + "18" : C.danger + "18"}`,
+              transition:"border-color .2s",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <StatusDot color={info.installed ? "green" : "red"} />
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.text }}>{n}</span>
-              </div>
-              <Badge color={info.installed ? "green" : "red"} small>{info.installed ? "OK" : "MISS"}</Badge>
+              <span style={{ fontFamily:font, fontSize:11, color:C.text }}>{n}</span>
+              <Row gap={4}>
+                <Badge color={C.textMuted} sm>{info.category}</Badge>
+                <Badge color={info.installed ? C.accent : C.danger} sm>{info.installed ? "OK" : "✗"}</Badge>
+              </Row>
             </div>
           ))}
         </div>
       </Card>
       {pf?.warnings?.map((w, i) => (
-        <div key={i} style={{ padding: "10px 14px", background: "rgba(255,214,10,0.05)", border: `1px solid rgba(255,214,10,0.2)`, borderLeft: `2px solid ${t.yellow}`, borderRadius: 6, color: t.yellow, fontSize: 11, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-          ⚠ {w}
+        <div key={i} style={{
+          padding:"9px 14px", background:`${C.warn}08`, border:`1px solid ${C.warn}25`,
+          borderLeft:`3px solid ${C.warn}`, borderRadius:4, color:C.warn,
+          fontSize:11, fontFamily:font, marginTop:8, display:"flex", gap:8, alignItems:"center",
+        }}>
+          <span>⚠</span> {w}
         </div>
       ))}
-      <Btn onClick={run} disabled={ld}>{ld ? "⟳ Checking..." : "↺ Re-run Preflight"}</Btn>
+      <Btn onClick={run} sx={{ marginTop:12 }}>↺ Re-run Preflight</Btn>
     </div>
   );
 }
 
+// ═══════════════════════════════════════════
+// PAGE: INTERFACES
+// ═══════════════════════════════════════════
 function InterfacesPage() {
-  const t = useTheme();
-  const [ifaces, setIfaces] = useState([]); const [ld, setLd] = useState(false); const [log, setLog] = useState([]); const [mac, setMac] = useState("");
-  const refresh = async () => { setLd(true); const d = await api("/interfaces/"); if (Array.isArray(d)) setIfaces(d); setLd(false); };
+  const C = useTheme();
+  const [ifs, setIfs] = useState([]); const [ld, setLd] = useState(false);
+  const [log, setLog] = useState([]); const [mac, setMac] = useState(""); const [vendor, setVendor] = useState("");
+  const refresh = async () => { setLd(true); const d = await api("/interfaces/"); if (Array.isArray(d)) setIfs(d); setLd(false); };
   useEffect(() => { refresh(); }, []);
-  const addL = (m) => setLog(p => [...p, m]);
+  const act = async (n, a) => {
+    setLog(p => [...p, `${a} → ${n}`]);
+    const r = await api(`/interfaces/${n}/${a}`, { method:"POST" });
+    setLog(p => [...p, JSON.stringify(r, null, 2)]);
+    refresh();
+  };
+  const chgMac = async n => {
+    const q = vendor ? `?vendor_prefix=${vendor}` : mac ? `?new_mac=${mac}` : "";
+    setLog(p => [...p, `MAC change on ${n}${q}`]);
+    const r = await api(`/interfaces/${n}/mac${q}`, { method:"POST" });
+    setLog(p => [...p, JSON.stringify(r, null, 2)]);
+    refresh();
+  };
+  const getChannels = async n => {
+    const r = await api(`/interfaces/${n}/channels`);
+    setLog(p => [...p, `Channels for ${n}:`, JSON.stringify(r, null, 2)]);
+  };
   return (
-    <div className="page-content">
-      <GlitchText text="// NETWORK INTERFACES" />
-      <Btn onClick={refresh} disabled={ld} style={{ marginBottom: 16 }}>{ld ? "⟳ Scanning..." : "↺ Refresh"}</Btn>
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", marginBottom: 20 }}>
-        {ifaces.map(iface => (
-          <Card key={iface.name} title={iface.name} color={iface.mode === "monitor" ? "green" : "accent"}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.textMuted, lineHeight: 2, marginBottom: 12 }}>
-              {[["MAC", iface.mac], ["Driver", iface.driver || "?"], ["Chipset", iface.chipset || "?"]].map(([k, v]) => (
-                <div key={k} style={{ display: "flex", gap: 8 }}>
-                  <span style={{ color: t.textDim, minWidth: 60 }}>{k}</span>
-                  <span style={{ color: t.textBright }}>{v}</span>
-                </div>
-              ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                <span style={{ color: t.textDim, minWidth: 60 }}>Mode</span>
-                <Badge color={iface.mode === "monitor" ? "green" : "blue"}>{iface.mode}</Badge>
+    <div className="page-in">
+      <PageTitle sub="Manage wireless adapters — monitor mode, MAC spoofing, TX power, channel support">Network Interfaces</PageTitle>
+      <Btn onClick={refresh} disabled={ld} sx={{ marginBottom:14 }}>
+        {ld ? <><Spinner size={12} /> Scanning...</> : "↺ Refresh Interfaces"}
+      </Btn>
+      <div style={{ display:"grid", gap:12, gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", marginBottom:16 }}>
+        {ifs.map(i => {
+          const modeColor = i.mode === "monitor" ? C.accent : C.info;
+          const isUp = i.is_up;
+          return (
+          <div key={i.name} className="anim-up card-hover" style={{
+            background:C.bgCard, borderRadius:8, overflow:"hidden",
+            border:`1px solid ${modeColor}20`,
+            boxShadow:`0 4px 24px ${C.isDark ? "rgba(0,0,0,.5)" : "rgba(0,0,0,.08)"}`,
+            backdropFilter:"blur(12px)", position:"relative",
+          }}>
+            {/* Top accent bar */}
+            <div style={{ height:3, background:`linear-gradient(90deg, ${modeColor}80, ${modeColor}20, transparent)` }} />
+            {/* Header */}
+            <div style={{ padding:"12px 16px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:10, height:10, borderRadius:"50%", background: isUp ? modeColor : C.danger, boxShadow:`0 0 8px ${isUp ? modeColor : C.danger}`, animation: i.mode === "monitor" ? "pulse 2s infinite" : "none" }} />
+                <span style={{ fontFamily:fontDisplay, fontSize:14, color:modeColor, fontWeight:700, letterSpacing:".08em" }}>{i.name}</span>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <span style={{ color: t.textDim, minWidth: 60 }}>Status</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <StatusDot color={iface.is_up ? "green" : "red"} />
-                  <span style={{ color: iface.is_up ? t.green : t.red }}>{iface.is_up ? "UP" : "DOWN"}</span>
-                </div>
+              <Row gap={4}>
+                <Badge color={modeColor}>{i.mode}</Badge>
+                <Badge color={isUp ? C.accent : C.danger} sm>{isUp ? "UP" : "DOWN"}</Badge>
+              </Row>
+            </div>
+            {/* Body */}
+            <div style={{ padding:"12px 16px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, fontFamily:font, fontSize:12, marginBottom:12 }}>
+                {[["MAC", i.mac || "—"], ["Driver", i.driver || "—"], ["Chipset", (i.chipset || "—").slice(0,30)], ["TX Power", i.tx_power ? `${i.tx_power} dBm` : "—"]].map(([k, v]) => (
+                  <div key={k} style={{ padding:"5px 8px", background:C.bgInput, borderRadius:3, border:`1px solid ${C.border}40` }}>
+                    <div style={{ fontSize:9, color:C.textMuted, textTransform:"uppercase", letterSpacing:".1em", marginBottom:2 }}>{k}</div>
+                    <div style={{ color:C.text, fontSize:11, wordBreak:"break-all" }}>{v}</div>
+                  </div>
+                ))}
               </div>
+              <Row gap={4} sx={{ marginBottom:10 }}>
+                <Badge color={i.supports_5ghz ? C.accent : C.textMuted} sm>5 GHz: {i.supports_5ghz ? "✓" : "✗"}</Badge>
+                <Badge color={i.supports_monitor ? C.accent : C.textMuted} sm>Monitor: {i.supports_monitor ? "✓" : "✗"}</Badge>
+              </Row>
+              <Row gap={6} sx={{ flexWrap:"wrap" }}>
+                {i.mode === "managed"
+                  ? <Btn sm onClick={() => act(i.name, "monitor")} color={C.accent}>▶ Monitor Mode</Btn>
+                  : <Btn sm onClick={() => act(i.name, "managed")} color={C.warn}>◼ Managed Mode</Btn>}
+                <Btn sm onClick={() => chgMac(i.name)} color={C.purple}>MAC Spoof</Btn>
+                <Btn sm onClick={() => getChannels(i.name)} color={C.info} ghost>Channels</Btn>
+              </Row>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {iface.mode === "managed"
-                ? <Btn small onClick={async () => { addL(`airmon-ng start ${iface.name}`); addL(JSON.stringify(await api(`/interfaces/${iface.name}/monitor`, { method: "POST" }), null, 2)); refresh(); }} color="green">⚡ Enable Monitor</Btn>
-                : <Btn small onClick={async () => { addL(`airmon-ng stop ${iface.name}`); addL(JSON.stringify(await api(`/interfaces/${iface.name}/managed`, { method: "POST" }), null, 2)); refresh(); }} color="yellow">↩ Restore Managed</Btn>}
-              <Btn small onClick={async () => { addL(`macchanger ${mac || "-r"} ${iface.name}`); addL(JSON.stringify(await api(`/interfaces/${iface.name}/mac?new_mac=${mac || ""}`, { method: "POST" }), null, 2)); refresh(); }} color="pink">⟳ Change MAC</Btn>
-            </div>
-          </Card>
-        ))}
-        {ifaces.length === 0 && !ld && (
-          <div style={{ color: t.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11, padding: 20, textAlign: "center" }}>
-            // no wireless interfaces detected
           </div>
+        );})}
+        {ifs.length === 0 && !ld && (
+          <div style={{ color:C.textMuted, fontFamily:font, padding:30, textAlign:"center" }}>No wireless interfaces detected. Connect a WiFi adapter.</div>
         )}
       </div>
-      <Input label="Custom MAC (empty = random)" value={mac} onChange={setMac} placeholder="AA:BB:CC:DD:EE:FF" />
-      <Card title="Operation Log" color="green"><TerminalLog lines={log} maxH={180} /></Card>
+      <Grid cols={2}>
+        <Input label="Custom MAC" value={mac} onChange={setMac} placeholder="AA:BB:CC:DD:EE:FF" />
+        <Input label="Vendor Prefix (spoof)" value={vendor} onChange={setVendor} placeholder="00:1A:2B (mimics vendor)" />
+      </Grid>
+      <Card title="Operations Log" color={C.accentDim}><Log lines={log} /></Card>
     </div>
   );
 }
 
+// ═══════════════════════════════════════════
+// PAGE: WIFI SCAN
+// ═══════════════════════════════════════════
 function WifiScanPage() {
-  const t = useTheme();
-  const [iface, setIface] = useState("wlan0mon"); const [ch, setCh] = useState(""); const [dur, setDur] = useState("30"); const [tb, setTb] = useState("");
-  const [scanning, setScanning] = useState(false); const [res, setRes] = useState(null); const [scans, setScans] = useState([]); const [sel, setSel] = useState(null);
-  const doScan = async () => { setScanning(true); setRes(null); setRes(await api("/wifi/scan", { method: "POST", body: JSON.stringify({ interface: iface, duration: parseInt(dur) || 30, channel: ch ? parseInt(ch) : null, target_bssid: tb || null }) })); setScanning(false); };
+  const C = useTheme();
+  const [iface, sI] = useState("wlan0mon"); const [ch, sCh] = useState(""); const [dur, sD] = useState("30");
+  const [bssid, sB] = useState(""); const [essid, sE] = useState(""); const [band, sBa] = useState("bg");
+  const [scanning, setSc] = useState(false); const [res, sR] = useState(null);
+  const [sel, sS] = useState(null); const [pnl, sPnl] = useState(null);
+  const [scans, setScans] = useState([]);
+  const bands = [{ value:"bg", label:"2.4 GHz" }, { value:"a", label:"5 GHz" }, { value:"abg", label:"Dual-Band" }];
+  const scan = async () => {
+    setSc(true); sR(null); sPnl(null);
+    const r = await api("/wifi/scan", { method:"POST", body:JSON.stringify({ interface:iface, duration:parseInt(dur) || 30, channel:ch ? parseInt(ch) : null, target_bssid:bssid || null, target_essid:essid || null, band }) });
+    sR(r); setSc(false); loadScans();
+  };
   const loadScans = async () => { const d = await api("/wifi/scans"); if (Array.isArray(d)) setScans(d); };
+  const loadScan = async id => { const d = await api(`/wifi/scans/${id}`); sR(d); };
+  const loadPnl = async id => { const r = await api(`/wifi/scans/${id}/pnl`); sPnl(r); };
   useEffect(() => { loadScans(); }, []);
-  const aps = res?.access_points || [];
-  const cols = [
-    { key: "essid", label: "ESSID", render: v => <span style={{ color: t.textBright, fontWeight: 700 }}>{v || "<hidden>"}</span> },
-    { key: "bssid", label: "BSSID", render: v => <span style={{ color: t.textMuted }}>{v}</span> },
-    { key: "channel", label: "CH", render: v => <span style={{ color: t.accent }}>{v}</span> },
-    { key: "power", label: "PWR", render: v => <span style={{ color: v > -50 ? t.green : v > -70 ? t.yellow : t.red, fontWeight: 700 }}>{v} dBm</span> },
-    { key: "security", label: "Sec", render: v => <Badge color={SEC_COLORS[v] || "textDim"} small>{v}</Badge> },
-    { key: "cipher", label: "Cipher" },
-    { key: "wps", label: "WPS", render: v => v ? <Badge color="orange" small>YES</Badge> : <span style={{ color: t.textDim }}>—</span> },
-    { key: "clients", label: "Cli", render: v => <span style={{ color: t.accent }}>{v?.length || 0}</span> },
-    { key: "data_packets", label: "Data" },
+  const aps = res?.access_points || []; const clients = res?.clients || [];
+  const apCols = [
+    { key:"essid", label:"ESSID", render:v => <span style={{ color:C.text, fontWeight:700 }}>{v || "<hidden>"}</span> },
+    { key:"bssid", label:"BSSID" }, { key:"channel", label:"CH" },
+    { key:"power", label:"PWR", render:v => <span style={{ color:v > -50 ? C.accent : v > -70 ? C.warn : C.danger }}>{v} dBm</span> },
+    { key:"security", label:"SEC", render:v => <Badge color={SEC[v] || C.textMuted} sm>{v}</Badge> },
+    { key:"auth", label:"AUTH" }, { key:"band", label:"Band", render:v => v || "—" },
+    { key:"manufacturer", label:"Vendor", render:v => <span style={{ color:C.purple, fontSize:9 }}>{v || "—"}</span> },
+    { key:"clients", label:"Cli", render:v => <span style={{ color:C.accent, fontWeight:700 }}>{v?.length || 0}</span> },
+    { key:"pmkid_available", label:"PMKID", render:v => v ? <Badge color={C.warn} sm>YES</Badge> : "—" },
   ];
   return (
-    <div className="page-content">
-      <GlitchText text="// WIFI SCANNER" />
-      <Card title="Scan Configuration">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
-          <Input label="Interface" value={iface} onChange={setIface} />
-          <Input label="Channel" value={ch} onChange={setCh} placeholder="all" />
-          <Input label="Duration (s)" value={dur} onChange={setDur} />
-          <Input label="BSSID Filter" value={tb} onChange={setTb} />
+    <div className="page-in">
+      <PageTitle sub="Discover WiFi networks with airodump-ng — 2.4 GHz, 5 GHz, and dual-band">WiFi Scanner</PageTitle>
+      <Card title="Scan Configuration" accent>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1fr", gap:8 }}>
+          <Input label="Interface" value={iface} onChange={sI} />
+          <Select label="Band" value={band} onChange={sBa} options={bands} />
+          <Input label="Channel" value={ch} onChange={sCh} placeholder="all" />
+          <Input label="Duration (s)" value={dur} onChange={sD} />
+          <Input label="Target BSSID" value={bssid} onChange={sB} placeholder="optional" />
+          <Input label="Target ESSID" value={essid} onChange={sE} placeholder="optional" />
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-          <Btn onClick={doScan} disabled={scanning} color="green">{scanning ? "⟳ Scanning..." : "▶ Start Scan"}</Btn>
-          <Btn onClick={loadScans} small color="blue">↻ Load Previous</Btn>
-        </div>
+        <Row gap={8} sx={{ marginTop:8 }}>
+          <Btn onClick={scan} disabled={scanning} color={C.accent}>
+            {scanning ? <><Spinner size={12} /> Scanning...</> : "▶ Start Scan"}
+          </Btn>
+          <Btn onClick={loadScans} sm ghost>↺ History ({scans.length})</Btn>
+        </Row>
       </Card>
-      {scanning && (
-        <div style={{ textAlign: "center", padding: 48 }}>
-          <div style={{ fontSize: 13, color: t.accent, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, letterSpacing: "0.2em", animation: "pulse 1.5s infinite", textShadow: `0 0 20px ${t.accentGlow}` }}>
-            ◉ SCANNING — {dur}s
-          </div>
-          <div style={{ marginTop: 12, height: 2, background: `linear-gradient(90deg, transparent, ${t.accent}, transparent)`, animation: "pulse 1.5s infinite", borderRadius: 1 }} />
-        </div>
-      )}
-      {res && (
-        <>
-          <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <Stat label="Networks" value={aps.length} color="accent" icon="📡" />
-            <Stat label="Clients" value={res.client_count || 0} color="pink" icon="📱" />
-            <Stat label="Open" value={aps.filter(a => a.security === "open").length} color="red" icon="⚠" />
-            <Stat label="WPA2" value={aps.filter(a => a.security === "wpa2").length} color="blue" icon="🔒" />
-          </div>
-          <Card title={`Access Points (${aps.length})`}>
-            <DataTable columns={cols} data={aps} onRowClick={setSel} />
-          </Card>
-        </>
-      )}
+      {scanning && <LoadingOverlay message={`Scanning ${band === "abg" ? "dual-band" : band === "a" ? "5 GHz" : "2.4 GHz"} airwaves`} duration={parseInt(dur) || 30} />}
+      {res && !scanning && <>
+        <Row gap={10} wrap sx={{ marginBottom:12 }}>
+          {[["Networks", aps.length, C.accent, "📡"], ["Clients", clients.length, C.purple, "📱"],
+            ["Open", aps.filter(a => a.security === "open").length, C.danger, "⚠"],
+            ["Enterprise", aps.filter(a => a.security?.includes("enterprise")).length, C.purple, "🏢"],
+            ["WPA3", aps.filter(a => a.security === "wpa3").length, C.accent, "🔒"]
+          ].map(([l, v, c, i]) => <Stat key={l} label={l} value={v} color={c} icon={i} />)}
+        </Row>
+        <Card title={`Access Points (${aps.length})`} accent>
+          <Table cols={apCols} data={aps} onRow={sS} />
+        </Card>
+        {res.id && <Btn onClick={() => loadPnl(res.id)} color={C.purple} sm sx={{ marginBottom:12 }}>Analyze PNL (Preferred Network Lists)</Btn>}
+      </>}
       {sel && (
-        <Card title={`AP Detail — ${sel.essid || sel.bssid}`} color="pink">
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.text, lineHeight: 2 }}>
+        <Card title={`AP Detail: ${sel.essid || sel.bssid}`} color={C.purple} accent>
+          <div style={{ fontFamily:font, fontSize:11, color:C.text, lineHeight:1.9, columnCount:2, columnGap:20 }}>
             {Object.entries(sel).map(([k, v]) => (
-              <div key={k} style={{ display: "flex", gap: 12, borderBottom: `1px solid ${t.border}`, padding: "3px 0" }}>
-                <span style={{ color: t.blue, minWidth: 120 }}>{k}</span>
-                <span style={{ color: t.textBright }}>{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
-              </div>
+              <div key={k}><span style={{ color:C.accent }}>{k}:</span> {typeof v === "object" ? JSON.stringify(v) : String(v)}</div>
             ))}
           </div>
-          <Btn small onClick={() => setSel(null)} style={{ marginTop: 12 }}>✕ Close</Btn>
+          <Btn sm onClick={() => sS(null)} sx={{ marginTop:10 }}>✕ Close</Btn>
         </Card>
       )}
-      {scans.length > 0 && (
-        <Card title="Previous Scans">
-          {scans.map(s => (
-            <div key={s.id} onClick={async () => setRes(await api(`/wifi/scans/${s.id}`))}
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: t.bgTableRow, borderRadius: 6, marginBottom: 6, fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.textMuted, cursor: "pointer", border: `1px solid ${t.border}`, transition: "all 0.15s" }}>
-              <span style={{ color: t.accent }}>#{s.id}</span>
-              <span>{s.access_points?.length || 0} APs</span>
-              <Badge color={s.status === "completed" ? "green" : "yellow"} small>{s.status}</Badge>
+      {pnl && (
+        <Card title="PNL Analysis — Evil Twin Intelligence" color={C.warn} accent>
+          <Row gap={10} wrap sx={{ marginBottom:10 }}>
+            <Stat label="Total Clients" value={pnl.total_clients} color={C.info} />
+            <Stat label="Associated" value={pnl.associated_clients} color={C.accent} />
+            <Stat label="Unassociated" value={pnl.unassociated_clients} color={C.warn} />
+          </Row>
+          {pnl.evil_twin_candidates?.length > 0 && (
+            <div style={{ padding:"10px 14px", background:`${C.danger}08`, border:`1px solid ${C.danger}25`, borderLeft:`3px solid ${C.danger}`, borderRadius:4, marginBottom:10 }}>
+              <div style={{ color:C.danger, fontSize:10, fontFamily:fontDisplay, textTransform:"uppercase", letterSpacing:".15em", marginBottom:6 }}>⚠ Evil Twin Candidates</div>
+              {pnl.evil_twin_candidates.map(s => (
+                <div key={s} style={{ color:C.warn, fontSize:12, fontFamily:font, marginBottom:2 }}>• "{s}" — probed by multiple unassociated clients</div>
+              ))}
+            </div>
+          )}
+          {pnl.unique_probed_networks?.length > 0 && (
+            <div style={{ fontFamily:font, fontSize:11, color:C.textMuted, marginBottom:8 }}>
+              All probed SSIDs: {pnl.unique_probed_networks.join(", ")}
+            </div>
+          )}
+          {pnl.clients?.map((c, i) => (
+            <div key={i} style={{
+              padding:"8px 12px", background:C.bgInput, borderRadius:3, marginBottom:5,
+              fontFamily:font, fontSize:10,
+              borderLeft:`2px solid ${c.vulnerability_notes?.length ? C.warn : C.accent}`,
+            }}>
+              <Row gap={8} sx={{ justifyContent:"space-between" }}>
+                <span style={{ color:C.text }}>{c.client_mac}</span>
+                <span style={{ color:C.purple }}>{c.manufacturer || "Unknown"}</span>
+                <Badge color={c.is_associated ? C.accent : C.textMuted} sm>{c.is_associated ? "Assoc" : "Free"}</Badge>
+              </Row>
+              {c.probed_networks?.length > 0 && <div style={{ color:C.textMuted, marginTop:3 }}>Probes: {c.probed_networks.join(", ")}</div>}
+              {c.vulnerability_notes?.map((n, j) => <div key={j} style={{ color:C.warn, fontSize:9, marginTop:2 }}>→ {n}</div>)}
             </div>
           ))}
         </Card>
       )}
-    </div>
-  );
-}
-
-function HandshakePage() {
-  const t = useTheme();
-  const [iface, setIface] = useState("wlan0mon"); const [bssid, setBssid] = useState(""); const [ch, setCh] = useState("6"); const [to, setTo] = useState("120");
-  const [deauth, setDeauth] = useState(true); const [dpkts, setDpkts] = useState("10"); const [caping, setCaping] = useState(false); const [capR, setCapR] = useState(null);
-  const [capFile, setCapFile] = useState(""); const [crBssid, setCrBssid] = useState(""); const [wl, setWl] = useState("rockyou.txt"); const [cracking, setCracking] = useState(false); const [crR, setCrR] = useState(null);
-  const [dI, setDI] = useState("wlan0mon"); const [dB, setDB] = useState(""); const [dC, setDC] = useState(""); const [dN, setDN] = useState("50"); const [dR, setDR] = useState(null);
-  const doCap = async () => { setCaping(true); setCapR(null); const r = await api("/wifi/handshake", { method: "POST", body: JSON.stringify({ interface: iface, target_bssid: bssid, channel: parseInt(ch), timeout: parseInt(to), deauth_first: deauth, deauth_packets: parseInt(dpkts) }) }); setCapR(r); if (r.capture_file) { setCapFile(r.capture_file); setCrBssid(bssid); } setCaping(false); };
-  const doCrack = async () => { setCracking(true); setCrR(null); setCrR(await api("/wifi/crack", { method: "POST", body: JSON.stringify({ capture_file: capFile, target_bssid: crBssid, wordlist: wl }) })); setCracking(false); };
-  const doDeauth = async () => { setDR(await api("/wifi/deauth", { method: "POST", body: JSON.stringify({ interface: dI, target_bssid: dB, client_mac: dC || null, packets: parseInt(dN), reason: "Audit" }) })); };
-  return (
-    <div className="page-content">
-      <GlitchText text="// HANDSHAKE & CRACK" />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Card title="Phase 1 — Capture Handshake" color="green">
-          <Input label="Interface" value={iface} onChange={setIface} />
-          <Input label="Target BSSID" value={bssid} onChange={setBssid} placeholder="AA:BB:CC:DD:EE:FF" />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Input label="Channel" value={ch} onChange={setCh} />
-            <Input label="Timeout (s)" value={to} onChange={setTo} />
-          </div>
-          <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 12 }}>
-            <Chk label="Deauth first" checked={deauth} onChange={setDeauth} />
-            {deauth && <Input label="Packets" value={dpkts} onChange={setDpkts} style={{ marginBottom: 0, width: 100 }} />}
-          </div>
-          <Btn onClick={doCap} disabled={caping || !bssid} color="green">{caping ? "⟳ Capturing..." : "▶ Capture"}</Btn>
-          {capR && (
-            <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 6, background: capR.handshake_captured ? "rgba(0,255,163,0.06)" : "rgba(255,45,85,0.06)", border: `1px solid ${capR.handshake_captured ? t.green : t.red}30` }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: capR.handshake_captured ? t.green : t.red, fontWeight: 700 }}>
-                {capR.handshake_captured ? "✓ HANDSHAKE CAPTURED" : "✗ No handshake detected"}
-              </div>
-              {capR.capture_file && <div style={{ color: t.textDim, fontSize: 10, marginTop: 4, fontFamily: "'Space Mono', monospace" }}>→ {capR.capture_file}</div>}
-            </div>
-          )}
-        </Card>
-        <Card title="Phase 2 — Crack WPA Key" color="yellow">
-          <Input label="Capture File" value={capFile} onChange={setCapFile} />
-          <Input label="Target BSSID" value={crBssid} onChange={setCrBssid} />
-          <Input label="Wordlist" value={wl} onChange={setWl} />
-          <Btn onClick={doCrack} disabled={cracking || !capFile} color="yellow">{cracking ? "⟳ Cracking..." : "▶ Crack"}</Btn>
-          {crR && (
-            <div style={{ marginTop: 14 }}>
-              {crR.success ? (
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ color: t.green, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 12 }}>✓ KEY FOUND</div>
-                  <div style={{ fontSize: 18, color: t.yellow, fontFamily: "'Space Mono', monospace", fontWeight: 700, padding: "12px 20px", background: "rgba(255,214,10,0.08)", borderRadius: 8, border: `1px solid ${t.yellow}30`, display: "inline-block", textShadow: `0 0 20px ${t.yellow}66` }}>{crR.key}</div>
-                </div>
-              ) : <div style={{ color: t.red, fontFamily: "'Space Mono', monospace", fontSize: 12 }}>✗ Key not found in wordlist</div>}
-            </div>
-          )}
-        </Card>
-      </div>
-      <Card title="Deauth Tool" color="orange" style={{ marginTop: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
-          <Input label="Interface" value={dI} onChange={setDI} />
-          <Input label="BSSID" value={dB} onChange={setDB} />
-          <Input label="Client" value={dC} onChange={setDC} placeholder="broadcast" />
-          <Input label="Packets" value={dN} onChange={setDN} />
-        </div>
-        <Btn onClick={doDeauth} disabled={!dB} color="orange" style={{ marginTop: 4 }}>⚡ Send Deauth</Btn>
-        {dR && <div style={{ marginTop: 12 }}><TerminalLog lines={[JSON.stringify(dR, null, 2)]} maxH={100} /></div>}
-      </Card>
-    </div>
-  );
-}
-
-function ReconPage() {
-  const t = useTheme();
-  const [tgt, setTgt] = useState("192.168.0.0/24"); const [st, setSt] = useState("quick"); const [ports, setPorts] = useState(""); const [ca, setCa] = useState(""); const [to, setTo] = useState("300");
-  const [scanning, setScanning] = useState(false); const [res, setRes] = useState(null); const [rr, setRr] = useState(null); const [ri, setRi] = useState("192.168.0.1"); const [sel, setSel] = useState(null);
-  const stOpts = [{ value: "quick", label: "Quick" }, { value: "full", label: "Full" }, { value: "vuln", label: "Vuln" }, { value: "os_detect", label: "OS Detect" }, { value: "service", label: "Service" }, { value: "stealth", label: "Stealth" }, { value: "udp", label: "UDP" }, { value: "custom", label: "Custom" }];
-  const doScan = async () => { setScanning(true); setRes(null); setRes(await api("/recon/scan", { method: "POST", body: JSON.stringify({ target: tgt, scan_type: st, ports: ports || null, custom_args: ca || null, timeout: parseInt(to) }) })); setScanning(false); };
-  const doDiscover = async () => { setScanning(true); setRes(null); setRes(await api(`/recon/discover?cidr=${encodeURIComponent(tgt)}`, { method: "POST" })); setScanning(false); };
-  const doDeep = async ip => { setScanning(true); setRes(await api(`/recon/deep/${ip}`, { method: "POST" })); setScanning(false); };
-  const doVuln = async ip => { setScanning(true); setRes(await api(`/recon/vuln/${ip}`, { method: "POST" })); setScanning(false); };
-  const hosts = res?.hosts || [];
-  const hCols = [
-    { key: "ip", label: "IP", render: v => <span style={{ color: t.accent, fontWeight: 700 }}>{v}</span> },
-    { key: "mac", label: "MAC", render: v => <span style={{ color: t.textMuted }}>{v || "—"}</span> },
-    { key: "hostname", label: "Host", render: v => v || <span style={{ color: t.textDim }}>—</span> },
-    { key: "os_guess", label: "OS", render: v => v ? <span style={{ color: t.pink }}>{v}</span> : <span style={{ color: t.textDim }}>—</span> },
-    { key: "ports", label: "Open", render: v => <span style={{ color: t.green, fontWeight: 700 }}>{v?.filter(p => p.state === "open").length || 0}</span> },
-    { key: "_a", label: "", render: (_, row) => <div style={{ display: "flex", gap: 4 }}><Btn small onClick={() => doDeep(row.ip)} color="blue">Deep</Btn><Btn small onClick={() => doVuln(row.ip)} color="orange">Vuln</Btn></div> },
-  ];
-  return (
-    <div className="page-content">
-      <GlitchText text="// NETWORK RECON" />
-      <Card title="Scan Configuration">
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 12 }}>
-          <Input label="Target" value={tgt} onChange={setTgt} />
-          <Select label="Scan Type" value={st} onChange={setSt} options={stOpts} />
-          <Input label="Ports" value={ports} onChange={setPorts} placeholder="22,80,443" />
-          <Input label="Timeout (s)" value={to} onChange={setTo} />
-        </div>
-        {st === "custom" && <Input label="Custom Args" value={ca} onChange={setCa} />}
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-          <Btn onClick={doScan} disabled={scanning} color="blue">{scanning ? "⟳ Scanning..." : "▶ Scan"}</Btn>
-          <Btn onClick={doDiscover} disabled={scanning} color="green">⌖ Discover</Btn>
-        </div>
-      </Card>
-      {res?.command && (
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: t.textDim, marginBottom: 12, padding: "6px 12px", background: t.bgTableRow, borderRadius: 6, border: `1px solid ${t.border}` }}>
-          <span style={{ color: t.accent }}>CMD </span><span style={{ color: t.termPrompt }}>{res.command}</span>
-        </div>
-      )}
-      {res && (
-        <>
-          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-            <Stat label="Hosts" value={hosts.length} color="accent" icon="🖥" />
-            <Stat label="Scan Type" value={res.scan_type?.toUpperCase()} color="pink" />
-            <Stat label="Status" value={res.status?.toUpperCase()} color={res.status === "completed" ? "green" : "yellow"} />
-          </div>
-          <Card title={`Hosts (${hosts.length})`}><DataTable columns={hCols} data={hosts} onRowClick={setSel} /></Card>
-        </>
-      )}
-      {sel && (
-        <Card title={`Host Detail — ${sel.ip}`} color="pink">
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, lineHeight: 1.8, color: t.text }}>
-            {[["MAC", sel.mac || "N/A"], ["Hostname", sel.hostname || "N/A"], ["OS", sel.os_guess || "N/A"]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", gap: 12, marginBottom: 4 }}>
-                <span style={{ color: t.textDim, minWidth: 80 }}>{k}</span>
-                <span style={{ color: k === "OS" ? t.pink : t.textBright }}>{v}</span>
+      {scans.length > 0 && !scanning && (
+        <Card title={`Scan History (${scans.length})`} color={C.info}>
+          <div style={{ maxHeight:200, overflowY:"auto" }}>
+            {scans.map(s => (
+              <div key={s.id} onClick={() => loadScan(s.id)}
+                style={{
+                  display:"flex", justifyContent:"space-between", alignItems:"center",
+                  padding:"8px 12px", background: res?.id === s.id ? `${C.accent}08` : C.bgInput,
+                  borderRadius:4, marginBottom:4, cursor:"pointer",
+                  fontFamily:font, fontSize:11, transition:"all .15s",
+                  borderLeft: res?.id === s.id ? `2px solid ${C.accent}` : `2px solid transparent`,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = C.bgHover}
+                onMouseLeave={e => e.currentTarget.style.background = res?.id === s.id ? `${C.accent}08` : C.bgInput}
+              >
+                <span style={{ color:C.text }}>#{s.id} — {s.interface} ({s.band || "bg"})</span>
+                <Row gap={6}>
+                  <span style={{ color:C.textMuted }}>{s.access_points?.length || 0} APs</span>
+                  <Badge color={s.status === "completed" ? C.accent : C.warn} sm>{s.status}</Badge>
+                </Row>
               </div>
             ))}
-            {sel.ports?.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ color: t.accent, fontSize: 9, letterSpacing: "0.15em", fontFamily: "'Orbitron', sans-serif", marginBottom: 6 }}>PORTS</div>
-                {sel.ports.map((p, i) => (
-                  <div key={i} style={{ display: "flex", gap: 10, padding: "4px 0", borderBottom: `1px solid ${t.border}`, alignItems: "center" }}>
-                    <span style={{ color: t.yellow, minWidth: 60 }}>{p.port}/{p.protocol}</span>
-                    <Badge color={p.state === "open" ? "green" : "red"} small>{p.state}</Badge>
-                    <span style={{ color: t.textMuted }}>{p.service || ""}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-          <Btn small onClick={() => setSel(null)} style={{ marginTop: 12 }}>✕ Close</Btn>
         </Card>
       )}
-      <Card title="CTF — Router Probe" color="red" style={{ marginTop: 16 }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-          <Input label="Router IP" value={ri} onChange={setRi} style={{ flex: 1, marginBottom: 0 }} />
-          <Btn onClick={async () => { setRr(null); setRr(await api("/recon/router", { method: "POST", body: JSON.stringify({ target_ip: ri, check_default_creds: true, check_known_vulns: true }) })); }} color="red" style={{ marginBottom: 0 }}>⚡ Probe</Btn>
-        </div>
-        {rr && (
-          <div style={{ marginTop: 14, fontFamily: "'Space Mono', monospace", fontSize: 11, lineHeight: 2 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              Reachable: <StatusDot color={rr.reachable ? "green" : "red"} />
-              <span style={{ color: rr.reachable ? t.green : t.red }}>{rr.reachable ? "YES" : "NO"}</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PAGE: HANDSHAKE & CRACK
+// ═══════════════════════════════════════════
+function HandshakePage() {
+  const C = useTheme();
+  const [iface, sI] = useState("wlan0mon"); const [bssid, sB] = useState(""); const [essid, sE] = useState(""); const [ch, sCh] = useState("6"); const [tout, sT] = useState("120");
+  const [dea, sDa] = useState(true); const [dp, sDp] = useState("10"); const [dc, sDc] = useState(""); const [band, sBa] = useState("bg");
+  const [cap, sCp] = useState(false); const [capR, sCR] = useState(null);
+  const [cf, sCf] = useState(""); const [cb, sCB] = useState(""); const [wl, sWl] = useState("rockyou.txt"); const [crk, sCrk] = useState(false); const [ckR, sCkR] = useState(null);
+  const [di, sDI] = useState("wlan0mon"); const [db, sDB] = useState(""); const [dcc, sDCC] = useState(""); const [dn, sDN] = useState("50"); const [de, sDE] = useState(""); const [dR, sDR] = useState(null);
+
+  const capture = async () => {
+    sCp(true); sCR(null);
+    const r = await api("/wifi/handshake", { method:"POST", body:JSON.stringify({ interface:iface, target_bssid:bssid, target_essid:essid || null, channel:parseInt(ch), timeout:parseInt(tout), deauth_first:dea, deauth_packets:parseInt(dp), deauth_client:dc || null, band }) });
+    sCR(r); if (r.capture_file) { sCf(r.capture_file); sCB(bssid); } sCp(false);
+  };
+  const crack = async () => { sCrk(true); sCkR(null); sCkR(await api("/wifi/crack", { method:"POST", body:JSON.stringify({ capture_file:cf, target_bssid:cb, wordlist:wl }) })); sCrk(false); };
+  const deauth = async () => { sDR(await api("/wifi/deauth", { method:"POST", body:JSON.stringify({ interface:di, target_bssid:db, client_mac:dcc || null, packets:parseInt(dn), use_essid:de || null, reason:"audit" }) })); };
+
+  return (
+    <div className="page-in">
+      <PageTitle sub="Capture WPA/WPA2 4-way handshake and crack with dictionary attack">Handshake & Crack</PageTitle>
+      <Grid cols={2}>
+        <Card title="1 · Capture Handshake" color={C.accent} accent>
+          <Input label="Interface" value={iface} onChange={sI} />
+          <Input label="Target BSSID" value={bssid} onChange={sB} placeholder="AA:BB:CC:DD:EE:FF" />
+          <Input label="Target ESSID (optional)" value={essid} onChange={sE} />
+          <Grid cols={3}>
+            <Input label="Channel" value={ch} onChange={sCh} />
+            <Input label="Timeout" value={tout} onChange={sT} />
+            <Select label="Band" value={band} onChange={sBa} options={[{ value:"bg", label:"2.4G" }, { value:"a", label:"5G" }, { value:"abg", label:"Dual" }]} />
+          </Grid>
+          <label style={{ fontFamily:font, fontSize:10, color:C.textMuted, display:"flex", gap:8, marginBottom:8, cursor:"pointer", alignItems:"center" }}>
+            <input type="checkbox" checked={dea} onChange={e => sDa(e.target.checked)} />
+            Send deauth first
+          </label>
+          {dea && (
+            <Grid cols={2}>
+              <Input label="Deauth packets" value={dp} onChange={sDp} />
+              <Input label="Target client MAC" value={dc} onChange={sDc} placeholder="all (broadcast)" />
+            </Grid>
+          )}
+          <Btn onClick={capture} disabled={cap || !bssid}>
+            {cap ? <><Spinner size={12} /> Capturing...</> : "▶ Capture Handshake"}
+          </Btn>
+          {cap && <LoadingOverlay message="Capturing WPA handshake" duration={parseInt(tout) || 120} />}
+          {capR && !cap && (
+            <div className="anim-up" style={{
+              marginTop:14, fontFamily:font, padding:"14px 18px", borderRadius:6,
+              background: capR.handshake_captured ? `${C.accent}08` : capR.error ? `${C.danger}08` : `${C.warn}08`,
+              border: `1px solid ${capR.handshake_captured ? C.accent : capR.error ? C.danger : C.warn}30`,
+              borderLeft: `3px solid ${capR.handshake_captured ? C.accent : capR.error ? C.danger : C.warn}`,
+            }}>
+              {capR.error ? (
+                <div style={{ color:C.danger, fontSize:13, fontWeight:600 }}>✗ Error: {capR.error}</div>
+              ) : capR.handshake_captured ? (
+                <div>
+                  <div style={{ color:C.accent, fontSize:14, fontWeight:700, fontFamily:fontDisplay, letterSpacing:".08em" }}>✓ HANDSHAKE CAPTURED!</div>
+                  <div style={{ color:C.textMuted, fontSize:11, marginTop:6 }}>Target: {capR.target_bssid} {capR.target_essid && `(${capR.target_essid})`}</div>
+                  <div style={{ color:C.textMuted, fontSize:11 }}>Channel: {capR.channel}</div>
+                  {capR.capture_file && <div style={{ color:C.info, fontSize:11, marginTop:4 }}>📁 {capR.capture_file}</div>}
+                  <div style={{ color:C.accent, fontSize:10, marginTop:6 }}>→ File auto-loaded in Crack panel. Ready to crack.</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ color:C.warn, fontSize:13, fontWeight:600 }}>⚠ No handshake captured</div>
+                  <div style={{ color:C.textMuted, fontSize:11, marginTop:4 }}>Try: increase timeout, verify clients are connected, or use PMKID attack instead.</div>
+                </div>
+              )}
             </div>
-            {rr.reachable && (
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-                {[["HTTP", rr.http_open], ["HTTPS", rr.https_open], ["SSH", rr.ssh_open], ["Telnet", rr.telnet_open]].map(([n, v]) => (
-                  <div key={n} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ color: t.textMuted }}>{n}</span>
-                    <Badge color={v ? (n === "Telnet" ? "red" : "green") : "textDim"} small>{v ? "OPEN" : "CLOSED"}</Badge>
+          )}
+        </Card>
+        <Card title="2 · Crack WPA Key" color={C.warn} accent>
+          <Input label="Capture File (.cap)" value={cf} onChange={sCf} />
+          <Input label="Target BSSID" value={cb} onChange={sCB} />
+          <Input label="Wordlist" value={wl} onChange={sWl} />
+          <Btn onClick={crack} disabled={crk || !cf} color={C.warn}>
+            {crk ? <><Spinner size={12} /> Cracking...</> : "▶ Crack Key"}
+          </Btn>
+          {ckR && (
+            <div className="anim-up" style={{ marginTop:14 }}>
+              {ckR.error ? (
+                <div style={{ padding:"12px 16px", background:`${C.danger}08`, border:`1px solid ${C.danger}30`, borderLeft:`3px solid ${C.danger}`, borderRadius:4, fontFamily:font, fontSize:12, color:C.danger }}>
+                  ✗ Error: {ckR.error}
+                </div>
+              ) : ckR.success ? (
+                <div style={{ padding:"18px", background:`${C.accent}06`, border:`1px solid ${C.accent}30`, borderRadius:6, textAlign:"center" }}>
+                  <div style={{ color:C.accent, fontSize:14, marginBottom:10, fontFamily:fontDisplay, fontWeight:700, letterSpacing:".12em" }}>✓ KEY FOUND!</div>
+                  <div style={{
+                    color:C.warn, fontSize:26, fontFamily:fontDisplay, fontWeight:900,
+                    padding:"12px 20px", background:`${C.warn}10`, borderRadius:6,
+                    border:`2px solid ${C.warn}50`, display:"inline-block",
+                    textShadow:`0 0 30px ${C.warn}80`,
+                    animation:"glowPulse 2s ease-in-out infinite",
+                    letterSpacing:".06em",
+                  }}>{ckR.key}</div>
+                  <div style={{ color:C.textMuted, fontSize:11, marginTop:10, fontFamily:font }}>
+                    Wordlist: {ckR.wordlist} · Target: {ckR.target_bssid}
                   </div>
-                ))}
+                </div>
+              ) : (
+                <div style={{ padding:"14px 18px", background:`${C.danger}08`, border:`1px solid ${C.danger}25`, borderLeft:`3px solid ${C.danger}`, borderRadius:4 }}>
+                  <div style={{ color:C.danger, fontSize:13, fontFamily:font, fontWeight:600 }}>✗ Key not found with this wordlist</div>
+                  <div style={{ color:C.textMuted, fontSize:11, fontFamily:font, marginTop:4 }}>Try a different wordlist. Generate custom ones with cewl (web scraping) or crunch (pattern-based).</div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </Grid>
+      <Card title="Deauth Tool" color={C.danger} accent>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr", gap:8 }}>
+          <Input label="Interface" value={di} onChange={sDI} />
+          <Input label="AP BSSID" value={db} onChange={sDB} />
+          <Input label="Client MAC" value={dcc} onChange={sDCC} placeholder="broadcast" />
+          <Input label="Packets" value={dn} onChange={sDN} />
+          <Input label="Or ESSID" value={de} onChange={sDE} placeholder="target by name" />
+        </div>
+        <Btn onClick={deauth} disabled={!db && !de} color={C.danger}>⚡ Send Deauth</Btn>
+        {dR && (
+          <div className="anim-up" style={{ marginTop:10, padding:"12px 16px", borderRadius:4, background: dR.success ? `${C.accent}06` : dR.error ? `${C.danger}08` : `${C.warn}06`, border:`1px solid ${dR.success ? C.accent : dR.error ? C.danger : C.warn}25`, borderLeft:`3px solid ${dR.success ? C.accent : dR.error ? C.danger : C.warn}` }}>
+            {dR.error ? (
+              <div style={{ color:C.danger, fontFamily:font, fontSize:12 }}>✗ Error: {dR.error}</div>
+            ) : (
+              <div style={{ fontFamily:font, fontSize:12 }}>
+                <div style={{ color: dR.success ? C.accent : C.danger, fontWeight:600 }}>{dR.success ? "✓ Deauth packets sent" : "✗ Deauth failed"}</div>
+                <div style={{ color:C.textMuted, fontSize:11, marginTop:4 }}>
+                  Packets: {dR.packets_sent} · Target: {dR.target} · Client: {dR.client}
+                </div>
+                {dR.output && <div style={{ color:C.text, fontSize:10, marginTop:6, padding:"6px 8px", background:C.bgInput, borderRadius:3, whiteSpace:"pre-wrap", maxHeight:80, overflowY:"auto" }}>{dR.output}</div>}
               </div>
             )}
           </div>
@@ -765,192 +964,676 @@ function ReconPage() {
   );
 }
 
-function AttacksPage() {
-  const t = useTheme();
-  const [etI, setEtI] = useState("wlan1"); const [etE, setEtE] = useState(""); const [etC, setEtC] = useState("6"); const [etN, setEtN] = useState("eth0"); const [etP, setEtP] = useState(false);
-  const [etS, setEtS] = useState(null); const [etL, setEtL] = useState(false);
-  const [mI, setMI] = useState("wlan0"); const [mT, setMT] = useState(""); const [mG, setMG] = useState("192.168.0.1"); const [mP, setMP] = useState("8080"); const [mH, setMH] = useState("");
-  const [mS, setMS] = useState(null); const [mL, setML] = useState(false);
-  const rSt = async () => { setEtS(await api("/attacks/evil-twin/status")); setMS(await api("/attacks/mitm/status")); };
-  useEffect(() => { rSt(); }, []);
+// ═══════════════════════════════════════════
+// PAGE: ADVANCED ATTACKS
+// ═══════════════════════════════════════════
+function AdvancedPage() {
+  const C = useTheme();
+  const [tab, setTab] = useState("pmkid");
+  const [pI, sPI] = useState("wlan0mon"); const [pB, sPB] = useState(""); const [pCh, sPCh] = useState("6"); const [pT, sPT] = useState("60"); const [pLd, sPLd] = useState(false); const [pR, sPR] = useState(null);
+  const [pcF, sPcF] = useState(""); const [pcB, sPcB] = useState(""); const [pcE, sPcE] = useState(""); const [pcW, sPcW] = useState("rockyou.txt"); const [pcLd, sPcLd] = useState(false); const [pcR, sPcR] = useState(null);
+  const [aM, sAM] = useState("wlan0mon"); const [aA, sAA] = useState("wlan1"); const [aE, sAE] = useState(""); const [aCh, sACh] = useState("6"); const [aP, sAP] = useState("fakepassword123"); const [aT, sAT] = useState("300"); const [aLd, sALd] = useState(false); const [aR, sAR] = useState(null); const [aS, sAS] = useState(null);
+  const [eM, sEM] = useState("wlan0mon"); const [eA, sEA] = useState("wlan1"); const [eE, sEE] = useState(""); const [eCh, sECh] = useState("6"); const [eEap, sEEap] = useState("PEAP"); const [eLd, sELd] = useState(false); const [eS, sES] = useState(null); const [eCreds, sECreds] = useState([]);
+  const [w3I, sW3I] = useState("wlan0mon"); const [w3B, sW3B] = useState(""); const [w3Ch, sW3Ch] = useState("6"); const [w3T, sW3T] = useState("transition_mode"); const [w3Ld, sW3Ld] = useState(false); const [w3R, sW3R] = useState(null);
+
+  const capPmkid = async () => { sPLd(true); sPR(null); sPR(await api("/advanced/pmkid/capture", { method:"POST", body:JSON.stringify({ interface:pI, target_bssid:pB, channel:parseInt(pCh), timeout:parseInt(pT) }) })); sPLd(false); };
+  const crkPmkid = async () => { sPcLd(true); sPcR(null); sPcR(await api("/advanced/pmkid/crack", { method:"POST", body:JSON.stringify({ pmkid_file:pcF, target_bssid:pcB, target_essid:pcE, wordlist:pcW }) })); sPcLd(false); };
+  const startApless = async () => { sALd(true); sAR(null); sAR(await api("/advanced/apless/start", { method:"POST", body:JSON.stringify({ monitor_interface:aM, ap_interface:aA, target_essid:aE, channel:parseInt(aCh), fake_passphrase:aP, capture_timeout:parseInt(aT) }) })); sALd(false); };
+  const startEnt = async () => { sELd(true); const r = await api("/advanced/enterprise/start", { method:"POST", body:JSON.stringify({ monitor_interface:eM, ap_interface:eA, target_essid:eE, channel:parseInt(eCh), eap_type:eEap }) }); sES(r); sELd(false); };
+  const stopEnt = async () => { const r = await api("/advanced/enterprise/stop", { method:"POST" }); sECreds(r.captured_credentials || []); sES(null); };
+  const w3Attack = async () => { sW3Ld(true); sW3R(null); sW3R(await api("/advanced/wpa3/attack", { method:"POST", body:JSON.stringify({ interface:w3I, target_bssid:w3B, channel:parseInt(w3Ch), attack_type:w3T, timeout:60 }) })); sW3Ld(false); };
+  useEffect(() => { api("/advanced/apless/status").then(sAS); api("/advanced/enterprise/status").then(sES); }, []);
+
+  const tabs = [{ id:"pmkid", label:"PMKID", color:C.warn }, { id:"apless", label:"AP-Less", color:C.purple }, { id:"enterprise", label:"Enterprise", color:C.info }, { id:"wpa3", label:"WPA3", color:C.accent }];
+
   return (
-    <div className="page-content">
-      <GlitchText text="// ATTACK VECTORS" />
-      <div style={{ padding: "8px 14px", background: "rgba(255,45,85,0.06)", border: `1px solid rgba(255,45,85,0.2)`, borderRadius: 6, color: t.red, fontSize: 10, fontFamily: "'Space Mono', monospace", marginBottom: 20, letterSpacing: "0.08em" }}>
-        ⚠ FOR AUTHORIZED PENETRATION TESTING ONLY — UNAUTHORIZED USE IS ILLEGAL
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Card title="Evil Twin AP" color="orange">
-          <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <StatusDot color={etS?.active ? "green" : "red"} />
-            <Badge color={etS?.active ? "green" : "textDim"}>{etS?.active ? "ACTIVE" : "INACTIVE"}</Badge>
-          </div>
-          {!etS?.active ? (
-            <>
-              <Input label="Interface" value={etI} onChange={setEtI} />
-              <Input label="ESSID" value={etE} onChange={setEtE} placeholder="Company_WiFi" />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Input label="Channel" value={etC} onChange={setEtC} />
-                <Input label="Internet Iface" value={etN} onChange={setEtN} />
-              </div>
-              <div style={{ marginBottom: 12 }}><Chk label="Captive Portal" checked={etP} onChange={setEtP} /></div>
-              <Btn onClick={async () => { setEtL(true); await api("/attacks/evil-twin/start", { method: "POST", body: JSON.stringify({ interface: etI, target_essid: etE, channel: parseInt(etC), internet_interface: etN || null, captive_portal: etP }) }); await rSt(); setEtL(false); }} disabled={etL || !etE} color="orange">{etL ? "⟳ Starting..." : "▶ Launch"}</Btn>
-            </>
-          ) : (
-            <>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.text, lineHeight: 1.8, marginBottom: 14 }}>
-                {etS.twin && Object.entries(etS.twin).map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", gap: 12 }}>
-                    <span style={{ color: t.textDim, minWidth: 80 }}>{k}</span>
-                    <span style={{ color: t.textBright }}>{String(v)}</span>
+    <div className="page-in">
+      <PageTitle sub="PMKID clientless attack, AP-less honeypot, WPA2-Enterprise credential capture, WPA3 exploitation">Advanced Attacks</PageTitle>
+      <Row gap={4} sx={{ marginBottom:16 }}>
+        {tabs.map(t => (
+          <Btn key={t.id} onClick={() => setTab(t.id)} color={t.color} ghost={tab !== t.id} sm
+            sx={tab === t.id ? { background:`${t.color}18`, boxShadow:`0 0 14px ${t.color}25` } : {}}>
+            {t.label}
+          </Btn>
+        ))}
+      </Row>
+
+      {tab === "pmkid" && (
+        <Grid cols={2}>
+          <Card title="PMKID Capture (No Clients Needed)" color={C.warn} accent>
+            <div style={{ fontSize:10, color:C.textMuted, fontFamily:font, marginBottom:10, lineHeight:1.7 }}>
+              Captures PMKID from the AP's first EAPOL message. No connected clients required — only the AP needs to be on.
+            </div>
+            <Input label="Interface (monitor)" value={pI} onChange={sPI} />
+            <Input label="Target BSSID" value={pB} onChange={sPB} placeholder="AA:BB:CC:DD:EE:FF" />
+            <Grid cols={2}><Input label="Channel" value={pCh} onChange={sPCh} /><Input label="Timeout (s)" value={pT} onChange={sPT} /></Grid>
+            <Btn onClick={capPmkid} disabled={pLd || !pB} color={C.warn}>
+              {pLd ? <><Spinner size={12} /> Capturing PMKID...</> : "▶ Capture PMKID"}
+            </Btn>
+            {pR && (
+              <div className="anim-up" style={{ marginTop:12, padding:"12px 16px", borderRadius:6, background: pR.pmkid_captured ? `${C.accent}08` : pR.error ? `${C.danger}08` : `${C.warn}08`, border:`1px solid ${pR.pmkid_captured ? C.accent : pR.error ? C.danger : C.warn}30`, borderLeft:`3px solid ${pR.pmkid_captured ? C.accent : pR.error ? C.danger : C.warn}` }}>
+                {pR.error ? (
+                  <div style={{ color:C.danger, fontFamily:font, fontSize:12 }}>✗ Error: {pR.error}</div>
+                ) : pR.pmkid_captured ? (
+                  <div>
+                    <div style={{ color:C.accent, fontSize:14, fontWeight:700, fontFamily:fontDisplay }}>✓ PMKID CAPTURED!</div>
+                    <div style={{ color:C.textMuted, fontSize:11, fontFamily:font, marginTop:4 }}>Method: <span style={{ color:C.info }}>{pR.method}</span></div>
+                    {pR.hash_file && <div style={{ color:C.warn, fontSize:11, fontFamily:font, marginTop:2 }}>Hash file: {pR.hash_file}</div>}
+                    <div style={{ color:C.accent, fontSize:10, fontFamily:font, marginTop:6 }}>→ Ready to crack. Use the Crack panel on the right.</div>
                   </div>
-                ))}
+                ) : (
+                  <div>
+                    <div style={{ color:C.warn, fontSize:13, fontFamily:font, fontWeight:600 }}>⚠ No PMKID captured</div>
+                    <div style={{ color:C.textMuted, fontSize:11, fontFamily:font, marginTop:4 }}>This AP may not support PMKID. Try traditional handshake capture instead.</div>
+                    <div style={{ color:C.textMuted, fontSize:10, fontFamily:font, marginTop:2 }}>Method used: {pR.method}</div>
+                  </div>
+                )}
               </div>
-              <Btn onClick={async () => { await api("/attacks/evil-twin/stop", { method: "POST" }); await rSt(); }} danger>◼ Stop</Btn>
-            </>
+            )}
+          </Card>
+          <Card title="Crack PMKID" color={C.warn} accent>
+            <div style={{ fontSize:10, color:C.textMuted, fontFamily:font, marginBottom:10, lineHeight:1.7 }}>
+              Crack using hashcat (GPU, fast) for .22000 files or aircrack-ng for .cap files.
+            </div>
+            <Input label="PMKID File (.22000 or .cap)" value={pcF} onChange={sPcF} />
+            <Input label="Target BSSID" value={pcB} onChange={sPcB} />
+            <Input label="Target ESSID" value={pcE} onChange={sPcE} />
+            <Input label="Wordlist" value={pcW} onChange={sPcW} />
+            <Btn onClick={crkPmkid} disabled={pcLd || !pcF} color={C.warn}>
+              {pcLd ? <><Spinner size={12} /> Cracking...</> : "▶ Crack PMKID"}
+            </Btn>
+            {pcR && (
+              <div className="anim-up" style={{ marginTop:10, fontFamily:font }}>
+                {pcR.success
+                  ? <div><div style={{ color:C.accent, fontSize:13 }}>✓ KEY FOUND:</div><div style={{ color:C.warn, fontSize:18, fontFamily:fontDisplay, fontWeight:700, marginTop:4 }}>{pcR.key}</div></div>
+                  : <div style={{ color:C.danger }}>✗ Not found in wordlist</div>}
+              </div>
+            )}
+          </Card>
+        </Grid>
+      )}
+
+      {tab === "apless" && (
+        <Card title="AP-Less Honeypot Attack" color={C.purple} accent>
+          <div style={{ fontSize:10, color:C.textMuted, fontFamily:font, marginBottom:10, lineHeight:1.7, maxWidth:700 }}>
+            Creates a fake AP with the target ESSID using hostapd. When a client with this SSID in its PNL tries to connect, the WPA handshake is captured.{" "}
+            <span style={{ color:C.warn }}>Requires TWO WiFi adapters.</span>
+          </div>
+          <Grid cols={3}>
+            <Input label="Monitor Interface" value={aM} onChange={sAM} />
+            <Input label="AP Interface (2nd card)" value={aA} onChange={sAA} />
+            <Input label="Target ESSID" value={aE} onChange={sAE} placeholder="Corp_WiFi" />
+          </Grid>
+          <Grid cols={3}>
+            <Input label="Channel" value={aCh} onChange={sACh} />
+            <Input label="Fake Passphrase" value={aP} onChange={sAP} />
+            <Input label="Timeout (s)" value={aT} onChange={sAT} />
+          </Grid>
+          <Btn onClick={startApless} disabled={aLd || !aE} color={C.purple}>
+            {aLd ? <><Spinner size={12} /> Running honeypot...</> : "▶ Launch AP-Less Attack"}
+          </Btn>
+          {aR && (
+            <div className="anim-up" style={{ marginTop:12, padding:"14px 18px", borderRadius:6, fontFamily:font, fontSize:12, background: aR.handshake_captured ? `${C.accent}08` : aR.error ? `${C.danger}08` : `${C.warn}08`, border:`1px solid ${aR.handshake_captured ? C.accent : aR.error ? C.danger : C.warn}30`, borderLeft:`3px solid ${aR.handshake_captured ? C.accent : aR.error ? C.danger : C.warn}` }}>
+              {aR.error ? (
+                <div style={{ color:C.danger }}>✗ Error: {aR.error}</div>
+              ) : aR.handshake_captured ? (
+                <div>
+                  <div style={{ color:C.accent, fontSize:14, fontWeight:700, fontFamily:fontDisplay }}>✓ HANDSHAKE CAPTURED from probing client!</div>
+                  {aR.capture_file && <div style={{ color:C.info, fontSize:11, marginTop:4 }}>📁 {aR.capture_file}</div>}
+                  <div style={{ color:C.accent, fontSize:10, marginTop:6 }}>→ The client attempted to authenticate with the real password. Crack the handshake to retrieve it.</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ color:C.warn, fontSize:13, fontWeight:600 }}>⚠ No handshake captured</div>
+                  <div style={{ color:C.textMuted, fontSize:11, marginTop:4 }}>No client probed for this SSID during the capture window. Try increasing timeout or verify that clients have this network in their PNL.</div>
+                </div>
+              )}
+            </div>
           )}
         </Card>
-        <Card title="Man-in-the-Middle" color="pink">
-          <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <StatusDot color={mS?.active ? "green" : "red"} />
-            <Badge color={mS?.active ? "green" : "textDim"}>{mS?.active ? "ACTIVE" : "INACTIVE"}</Badge>
+      )}
+
+      {tab === "enterprise" && (
+        <Card title="WPA2-Enterprise / 802.1X Attack" color={C.info} accent>
+          <div style={{ fontSize:10, color:C.textMuted, fontFamily:font, marginBottom:10, lineHeight:1.7, maxWidth:700 }}>
+            Deploys a rogue RADIUS server with an Evil Twin AP to intercept EAP credentials (PEAP, EAP-TTLS). Auto-generates SSL certificates.{" "}
+            <span style={{ color:C.warn }}>Requires TWO WiFi adapters.</span>
           </div>
-          {!mS?.active ? (
-            <>
-              <Input label="Interface" value={mI} onChange={setMI} />
-              <Input label="Target IPs" value={mT} onChange={setMT} placeholder="192.168.0.50, .51" />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Input label="Gateway" value={mG} onChange={setMG} />
-                <Input label="Proxy Port" value={mP} onChange={setMP} />
-              </div>
-              <Input label="Filter Hosts" value={mH} onChange={setMH} />
-              <Btn onClick={async () => { setML(true); await api("/attacks/mitm/start", { method: "POST", body: JSON.stringify({ interface: mI, target_ips: mT.split(",").map(s => s.trim()).filter(Boolean), gateway: mG, proxy_port: parseInt(mP), filter_hosts: mH ? mH.split(",").map(s => s.trim()) : [] }) }); await rSt(); setML(false); }} disabled={mL || !mT} color="pink">{mL ? "⟳ Starting..." : "▶ Start"}</Btn>
-            </>
-          ) : (
-            <>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.text, lineHeight: 1.8, marginBottom: 14 }}>
-                {mS.session && Object.entries(mS.session).map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", gap: 12 }}>
-                    <span style={{ color: t.textDim, minWidth: 80 }}>{k}</span>
-                    <span style={{ color: t.textBright }}>{typeof v === "object" ? JSON.stringify(v) : String(v)}</span>
-                  </div>
-                ))}
-              </div>
-              <Btn onClick={async () => { await api("/attacks/mitm/stop", { method: "POST" }); await rSt(); }} danger>◼ Stop</Btn>
-            </>
+          <Grid cols={3}>
+            <Input label="Monitor Interface" value={eM} onChange={sEM} />
+            <Input label="AP Interface" value={eA} onChange={sEA} />
+            <Input label="Target ESSID" value={eE} onChange={sEE} placeholder="Corp_Enterprise" />
+          </Grid>
+          <Grid cols={2}>
+            <Input label="Channel" value={eCh} onChange={sECh} />
+            <Select label="EAP Type" value={eEap} onChange={sEEap} options={[{ value:"PEAP", label:"PEAP (most common)" }, { value:"EAP-TTLS", label:"EAP-TTLS" }, { value:"EAP-TLS", label:"EAP-TLS (cert-based)" }]} />
+          </Grid>
+          {!eS?.active
+            ? <Btn onClick={startEnt} disabled={eLd || !eE} color={C.info}>{eLd ? <><Spinner size={12} /> Deploying...</> : "▶ Start Enterprise Attack"}</Btn>
+            : <div><Badge color={C.accent}>ACTIVE</Badge><Btn onClick={stopEnt} danger sm sx={{ marginLeft:8 }}>◼ Stop & Extract Creds</Btn></div>}
+          {eCreds.length > 0 && (
+            <Card title={`Captured Credentials (${eCreds.length})`} color={C.danger} sx={{ marginTop:10 }}>
+              {eCreds.map((c, i) => (
+                <div key={i} style={{ padding:"5px 10px", background:C.bgInput, borderRadius:3, marginBottom:4, fontFamily:font, fontSize:11 }}>
+                  <Badge color={C.warn} sm>{c.type}</Badge>
+                  {c.username && <span style={{ color:C.text, marginLeft:8 }}>{c.username}</span>}
+                  {c.password && <span style={{ color:C.danger, marginLeft:8 }}>{c.password}</span>}
+                </div>
+              ))}
+            </Card>
           )}
         </Card>
-      </div>
+      )}
+
+      {tab === "wpa3" && (
+        <Card title="WPA3 / SAE Attacks" color={C.accent} accent>
+          <div style={{ fontSize:10, color:C.textMuted, fontFamily:font, marginBottom:10, lineHeight:1.7, maxWidth:700 }}>
+            WPA3 uses SAE (Dragonfly handshake) which resists offline dictionary attacks. However, APs in Transition Mode (WPA2+WPA3) are vulnerable to downgrade attacks.
+          </div>
+          <Grid cols={4}>
+            <Input label="Interface" value={w3I} onChange={sW3I} />
+            <Input label="Target BSSID" value={w3B} onChange={sW3B} />
+            <Input label="Channel" value={w3Ch} onChange={sW3Ch} />
+            <Select label="Attack Type" value={w3T} onChange={sW3T} options={[{ value:"transition_mode", label:"Check Transition Mode" }, { value:"downgrade", label:"Downgrade Exploit" }, { value:"dos", label:"SAE DoS Flood" }]} />
+          </Grid>
+          <Btn onClick={w3Attack} disabled={w3Ld || !w3B} color={C.accent}>
+            {w3Ld ? <><Spinner size={12} /> Attacking...</> : "▶ Execute"}
+          </Btn>
+          {w3R && (
+            <div className="anim-up" style={{ marginTop:14 }}>
+              {w3R.error ? (
+                <div style={{ padding:"12px 16px", background:`${C.danger}08`, border:`1px solid ${C.danger}30`, borderLeft:`3px solid ${C.danger}`, borderRadius:4, fontFamily:font, fontSize:12, color:C.danger }}>
+                  ✗ Error: {w3R.error}
+                </div>
+              ) : (
+                <div style={{ padding:"14px 18px", borderRadius:6, fontFamily:font, fontSize:12, lineHeight:1.8, background: w3R.transition_mode_detected ? `${C.warn}08` : w3R.vulnerable_to_downgrade === false ? `${C.accent}06` : `${C.info}06`, border:`1px solid ${w3R.transition_mode_detected ? C.warn : C.accent}25`, borderLeft:`3px solid ${w3R.transition_mode_detected ? C.warn : C.accent}` }}>
+                  {w3R.transition_mode_detected !== undefined && (
+                    <div style={{ fontFamily:fontDisplay, fontSize:14, fontWeight:700, color:w3R.transition_mode_detected ? C.warn : C.accent, marginBottom:8, letterSpacing:".06em" }}>
+                      {w3R.transition_mode_detected ? "⚠ TRANSITION MODE — VULNERABLE" : "✓ WPA3-ONLY MODE — SECURE"}
+                    </div>
+                  )}
+                  {w3R.security_info && <div style={{ color:C.text }}>{w3R.security_info}</div>}
+                  {w3R.recommendation && <div style={{ color:C.info, marginTop:8, padding:"8px 12px", background:`${C.info}08`, borderRadius:4, borderLeft:`2px solid ${C.info}40` }}>{w3R.recommendation}</div>}
+                  {w3R.next_steps && <div style={{ marginTop:8 }}>{w3R.next_steps.map((s, i) => <div key={i} style={{ color:C.text, fontSize:11, padding:"2px 0" }}>{s}</div>)}</div>}
+                  {w3R.note && <div style={{ color:C.warn, marginTop:8, fontStyle:"italic" }}>{w3R.note}</div>}
+                  {w3R.packets_sent && <div style={{ color:C.textMuted, marginTop:4 }}>Packets sent: {w3R.packets_sent}</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
 
-function SessionsPage() {
-  const t = useTheme();
-  const [sessions, setSessions] = useState([]); const [sel, setSel] = useState(null); const [report, setReport] = useState(null);
-  const [name, setName] = useState(""); const [company, setCompany] = useState(""); const [auditor, setAuditor] = useState(""); const [notes, setNotes] = useState("");
-  const [fCat, setFCat] = useState("wifi"); const [fSev, setFSev] = useState("medium"); const [fT, setFT] = useState(""); const [fD, setFD] = useState(""); const [fE, setFE] = useState(""); const [fR, setFR] = useState("");
-  const refresh = async () => { const d = await api("/sessions/"); if (Array.isArray(d)) setSessions(d); };
-  const select = async id => { setSel(await api(`/sessions/${id}`)); setReport(null); };
-  useEffect(() => { refresh(); }, []);
-  const sevOpts = [{ value: "critical", label: "Critical" }, { value: "high", label: "High" }, { value: "medium", label: "Medium" }, { value: "low", label: "Low" }, { value: "info", label: "Info" }];
-  const catOpts = [{ value: "wifi", label: "WiFi" }, { value: "network", label: "Network" }, { value: "router", label: "Router" }, { value: "credentials", label: "Credentials" }, { value: "encryption", label: "Encryption" }, { value: "access_control", label: "Access Control" }, { value: "other", label: "Other" }];
+// ═══════════════════════════════════════════
+// PAGE: RECON
+// ═══════════════════════════════════════════
+function ReconPage() {
+  const C = useTheme();
+  const [tgt, sT] = useState("192.168.0.0/24"); const [sty, sS] = useState("quick"); const [pts, sP] = useState(""); const [ca, sCA] = useState(""); const [to, sTO] = useState("300");
+  const [sc, sSc] = useState(false); const [res, sR] = useState(null); const [sel, sSel] = useState(null);
+  const [ri, sRI] = useState("192.168.0.1"); const [rr, sRR] = useState(null); const [rPorts, sRPorts] = useState("22,23,53,80,443,8080,8443"); const [rLd, setRLd] = useState(false);
+  const sts = [{ value:"quick", label:"Quick (Ping)" }, { value:"full", label:"Full (All Ports+OS)" }, { value:"vuln", label:"Vuln Scripts" }, { value:"os_detect", label:"OS Detect" }, { value:"service", label:"Service" }, { value:"stealth", label:"Stealth SYN" }, { value:"udp", label:"UDP Top 100" }, { value:"custom", label:"Custom Args" }];
+  const doS = async () => { sSc(true); sR(null); sR(await api("/recon/scan", { method:"POST", body:JSON.stringify({ target:tgt, scan_type:sty, ports:pts || null, custom_args:ca || null, timeout:parseInt(to) }) })); sSc(false); };
+  const disc = async () => { sSc(true); sR(await api(`/recon/discover?cidr=${encodeURIComponent(tgt)}`, { method:"POST" })); sSc(false); };
+  const deep = async ip => { sSc(true); sR(await api(`/recon/deep/${ip}`, { method:"POST" })); sSc(false); };
+  const vuln = async ip => { sSc(true); sR(await api(`/recon/vuln/${ip}`, { method:"POST" })); sSc(false); };
+  const probe = async () => { setRLd(true); sRR(await api("/recon/router", { method:"POST", body:JSON.stringify({ target_ip:ri, check_default_creds:true, check_known_vulns:true }) })); setRLd(false); };
+  const hosts = res?.hosts || [];
+  const hc = [
+    { key:"ip", label:"IP", render:v => <span style={{ color:C.text, fontWeight:700 }}>{v}</span> },
+    { key:"mac", label:"MAC" }, { key:"hostname", label:"Host", render:v => v || "—" },
+    { key:"os_guess", label:"OS", render:v => v ? <span style={{ color:C.purple }}>{v}</span> : "—" },
+    { key:"ports", label:"Open", render:v => <span style={{ color:C.accent, fontWeight:700 }}>{v?.filter(p => p.state === "open").length || 0}</span> },
+    { key:"_", label:"", render:(_, r) => <Row gap={4}><Btn sm onClick={() => deep(r.ip)} color={C.info}>Deep</Btn><Btn sm onClick={() => vuln(r.ip)} color={C.warn}>Vuln</Btn></Row> },
+  ];
   return (
-    <div className="page-content">
-      <GlitchText text="// AUDIT SESSIONS" />
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
-        <div>
-          <Card title="New Session" color="green">
-            <Input label="Name" value={name} onChange={setName} />
-            <Input label="Company" value={company} onChange={setCompany} />
-            <Input label="Auditor" value={auditor} onChange={setAuditor} />
-            <Input label="Notes" value={notes} onChange={setNotes} />
-            <Btn onClick={async () => { await api("/sessions/", { method: "POST", body: JSON.stringify({ name, company, auditor, notes: notes || null }) }); setName(""); setCompany(""); setAuditor(""); setNotes(""); refresh(); }} disabled={!name || !company || !auditor} color="green">+ Create Session</Btn>
-          </Card>
-          <Card title="Sessions">
-            {sessions.map(s => (
-              <div key={s.id} onClick={() => select(s.id)} style={{
-                padding: "10px 12px", background: sel?.id === s.id ? t.accentDim : t.bgTableRow,
-                border: `1px solid ${sel?.id === s.id ? t.accent + "40" : t.border}`,
-                borderLeft: `2px solid ${sel?.id === s.id ? t.accent : "transparent"}`,
-                borderRadius: 6, marginBottom: 6, cursor: "pointer", transition: "all 0.15s",
-              }}>
-                <div style={{ color: t.textBright, fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{s.name}</div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: t.textMuted, fontFamily: "'Space Mono', monospace", fontSize: 10 }}>{s.company}</span>
-                  <Badge color={s.status === "active" ? "green" : "textDim"} small>{s.status}</Badge>
+    <div className="page-in">
+      <PageTitle sub="Network reconnaissance with nmap — 8 scan profiles, host discovery, vulnerability detection">Network Recon</PageTitle>
+      <Card title="Nmap Configuration" accent>
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:8 }}>
+          <Input label="Target (IP/CIDR)" value={tgt} onChange={sT} />
+          <Select label="Scan Type" value={sty} onChange={sS} options={sts} />
+          <Input label="Ports (empty=default)" value={pts} onChange={sP} placeholder="22,80,443 or 1-65535" />
+          <Input label="Timeout" value={to} onChange={sTO} />
+        </div>
+        {sty === "custom" && <Input label="Custom Args" value={ca} onChange={sCA} placeholder="-sS -T4 --script=http-enum" />}
+        <Row gap={4} sx={{ marginTop:4, marginBottom:6 }}>
+          <Btn sm ghost onClick={() => sP("1-65535")} color={C.warn}>All 65535 Ports</Btn>
+          <Btn sm ghost onClick={() => sP("1-1024")} color={C.info}>Top 1024</Btn>
+          <Btn sm ghost onClick={() => sP("")} color={C.textMuted}>Default</Btn>
+        </Row>
+        <Row gap={8} sx={{ marginTop:8 }}>
+          <Btn onClick={doS} disabled={sc}>{sc ? <><Spinner size={12} /> Scanning...</> : "▶ Scan"}</Btn>
+          <Btn onClick={disc} disabled={sc} color={C.accent} ghost>Quick Discover</Btn>
+        </Row>
+      </Card>
+      {sc && <LoadingOverlay message="Running nmap scan" duration={parseInt(to) || 300} />}
+      {res?.command && <div style={{ fontFamily:font, fontSize:11, color:C.textMuted, marginBottom:8, padding:"6px 10px", background:C.bgInput, borderRadius:3, borderLeft:`2px solid ${C.info}` }}>$ {res.command}</div>}
+      {res && !sc && (
+        <>
+          {res.error ? (
+            <div className="anim-up" style={{ padding:"14px 18px", background:`${C.danger}08`, border:`1px solid ${C.danger}30`, borderLeft:`3px solid ${C.danger}`, borderRadius:4, fontFamily:font, fontSize:12, color:C.danger, marginBottom:12 }}>
+              ✗ Scan failed: {res.error}
+            </div>
+          ) : (
+          <>
+          <Row gap={10} sx={{ marginBottom:12 }} wrap>
+            <Stat label="Hosts" value={hosts.length} color={hosts.length > 0 ? C.accent : C.warn} icon="🖥" />
+            <Stat label="Type" value={res.scan_type?.toUpperCase()} color={C.purple} icon="⚡" />
+            <Stat label="Status" value={res.status?.toUpperCase()} color={res.status === "completed" ? C.accent : C.danger} icon="◉" />
+          </Row>
+          <Card title={`Hosts (${hosts.length})`} accent><Table cols={hc} data={hosts} onRow={sSel} /></Card>
+          </>)}</>
+      )}
+      {sel && (
+        <Card title={`Host Detail: ${sel.ip}`} color={C.purple} accent>
+          <div style={{ fontFamily:font, fontSize:12, lineHeight:1.7 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:12 }}>
+              {[["IP", sel.ip, C.text], ["MAC", sel.mac || "—", C.textMuted], ["Hostname", sel.hostname || "—", C.info], ["OS", sel.os_guess || "—", C.purple]].map(([k, v, c]) => (
+                <div key={k} style={{ padding:"6px 10px", background:C.bgInput, borderRadius:3 }}>
+                  <div style={{ fontSize:9, color:C.textMuted, textTransform:"uppercase", letterSpacing:".1em" }}>{k}</div>
+                  <div style={{ color:c, fontSize:12, marginTop:2, wordBreak:"break-all" }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            {sel.ports?.filter(p => p.state === "open").length > 0 && (
+              <div>
+                <div style={{ fontSize:10, fontFamily:fontDisplay, color:C.accent, textTransform:"uppercase", letterSpacing:".12em", marginBottom:8 }}>
+                  Open Ports ({sel.ports.filter(p => p.state === "open").length})
+                </div>
+                {sel.ports.filter(p => p.state === "open").map((p, i) => (
+                  <div key={i} style={{ display:"flex", gap:12, padding:"5px 10px", background: i % 2 === 0 ? C.bgInput : "transparent", borderRadius:3, alignItems:"center" }}>
+                    <span style={{ color:C.warn, minWidth:65, fontWeight:700 }}>{p.port}/{p.protocol}</span>
+                    <span style={{ color:C.text, flex:1 }}>{p.service || "unknown"}</span>
+                    {p.scripts && Object.keys(p.scripts).length > 0 && <Badge color={C.danger} sm>scripts</Badge>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {sel.services?.length > 0 && (
+              <div style={{ marginTop:12 }}>
+                <div style={{ fontSize:10, fontFamily:fontDisplay, color:C.info, textTransform:"uppercase", letterSpacing:".12em", marginBottom:8 }}>
+                  Service Details
+                </div>
+                {sel.services.map((s, i) => (
+                  <div key={i} style={{ padding:"6px 10px", background:C.bgInput, borderRadius:3, marginBottom:4, display:"flex", gap:8, alignItems:"center" }}>
+                    <Badge color={C.warn} sm>{s.port}</Badge>
+                    <span style={{ color:C.text }}>{s.name}</span>
+                    <span style={{ color:C.accent }}>{s.product}</span>
+                    {s.version && <Badge color={C.info} sm>v{s.version}</Badge>}
+                    {s.extra && <span style={{ color:C.textMuted, fontSize:10 }}>({s.extra})</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <Btn sm onClick={() => sSel(null)} sx={{ marginTop:12 }}>✕ Close Detail</Btn>
+        </Card>
+      )}
+      <Card title="🏴 CTF — Router Probe" color={C.danger} accent sx={{ marginTop:8 }}>
+        <div style={{ fontSize:11, color:C.textMuted, fontFamily:font, marginBottom:8, lineHeight:1.6 }}>
+          Scan the router/gateway for open management ports. Identifies HTTP panels, SSH, Telnet, and running services.
+        </div>
+        <Row gap={8} sx={{ alignItems:"end" }}>
+          <Input label="Router IP" value={ri} onChange={sRI} sx={{ flex:1, marginBottom:0 }} />
+          <Input label="Ports (editable)" value={rPorts} onChange={sRPorts} placeholder="22,23,80,443,8080,8443" sx={{ flex:1, marginBottom:0 }} />
+          <Btn onClick={probe} disabled={rLd} color={C.danger}>{rLd ? <><Spinner size={12}/> Probing...</> : "▶ Probe"}</Btn>
+        </Row>
+        <Row gap={4} sx={{ marginTop:6 }}>
+          <Btn sm ghost onClick={() => sRPorts("1-65535")} color={C.warn}>All Ports (1-65535)</Btn>
+          <Btn sm ghost onClick={() => sRPorts("22,23,53,80,443,8080,8443")} color={C.info}>Common Ports</Btn>
+          <Btn sm ghost onClick={() => sRPorts("21,22,23,25,53,80,110,139,143,443,445,993,995,1433,1521,3306,3389,5432,5900,8080,8443")} color={C.purple}>Extended</Btn>
+        </Row>
+        {rLd && <LoadingOverlay message="Probing router ports" />}
+        {rr && !rLd && (
+          <div className="anim-up" style={{ marginTop:14 }}>
+            {rr.error ? (
+              <div style={{ padding:"12px 16px", background:`${C.danger}0a`, border:`1px solid ${C.danger}30`, borderLeft:`3px solid ${C.danger}`, borderRadius:4, fontFamily:font, fontSize:12, color:C.danger }}>
+                ✗ Error: {rr.error}
+              </div>
+            ) : (
+              <div style={{ padding:"14px 18px", background: rr.reachable ? `${C.accent}06` : `${C.danger}06`, border:`1px solid ${rr.reachable ? C.accent : C.danger}25`, borderLeft:`3px solid ${rr.reachable ? C.accent : C.danger}`, borderRadius:4 }}>
+                <div style={{ fontFamily:fontDisplay, fontSize:13, color: rr.reachable ? C.accent : C.danger, marginBottom:10, letterSpacing:".1em" }}>
+                  {rr.reachable ? "✓ ROUTER REACHABLE" : "✗ ROUTER UNREACHABLE"}
+                </div>
+                {rr.reachable && (
+                  <div style={{ fontFamily:font, fontSize:12, lineHeight:2 }}>
+                    {rr.hostname && <div style={{ color:C.textMuted }}>Hostname: <span style={{ color:C.text }}>{rr.hostname}</span></div>}
+                    {rr.os_guess && <div style={{ color:C.textMuted }}>OS: <span style={{ color:C.purple }}>{rr.os_guess}</span></div>}
+                    {rr.mac && <div style={{ color:C.textMuted }}>MAC: <span style={{ color:C.text }}>{rr.mac}</span></div>}
+                    <div style={{ marginTop:8, display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:6 }}>
+                      {[["HTTP (80)", rr.http_open], ["HTTPS (443)", rr.https_open], ["SSH (22)", rr.ssh_open], ["Telnet (23)", rr.telnet_open]].map(([l, v]) => (
+                        <div key={l} style={{ padding:"6px 10px", background:C.bgInput, borderRadius:3, border:`1px solid ${v ? (l.includes("Telnet") ? C.danger : C.accent) : C.border}30`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <span style={{ color:C.text, fontSize:11 }}>{l}</span>
+                          <Badge color={v ? (l.includes("Telnet") ? C.danger : C.accent) : C.textDim} sm>{v ? "OPEN" : "—"}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                    {rr.services?.length > 0 && (
+                      <div style={{ marginTop:10 }}>
+                        <div style={{ color:C.accent, fontSize:10, fontFamily:fontDisplay, textTransform:"uppercase", letterSpacing:".15em", marginBottom:6 }}>Detected Services</div>
+                        {rr.services.map((s, i) => (
+                          <div key={i} style={{ padding:"4px 10px", background:C.bgInput, borderRadius:3, marginBottom:3, display:"flex", gap:12, fontFamily:font, fontSize:11 }}>
+                            <span style={{ color:C.warn, minWidth:50 }}>:{s.port}</span>
+                            <span style={{ color:C.text }}>{s.name}</span>
+                            <span style={{ color:C.accent }}>{s.product} {s.version}</span>
+                            {s.extra && <span style={{ color:C.textMuted }}>{s.extra}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {rr.all_ports?.filter(p => p.state === "open").length > 0 && (
+                      <div style={{ marginTop:8 }}>
+                        <div style={{ color:C.info, fontSize:10, fontFamily:fontDisplay, textTransform:"uppercase", letterSpacing:".15em", marginBottom:6 }}>All Open Ports</div>
+                        <Row gap={4} wrap>
+                          {rr.all_ports.filter(p => p.state === "open").map((p, i) => (
+                            <Badge key={i} color={C.info} sm>{p.port}/{p.protocol}</Badge>
+                          ))}
+                        </Row>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PAGE: ATTACKS (Evil Twin + MITM)
+// ═══════════════════════════════════════════
+function AttacksPage() {
+  const C = useTheme();
+  const [ei, sEI] = useState("wlan1"); const [ee, sEE] = useState(""); const [ec, sEC] = useState("6"); const [en, sEN] = useState("eth0"); const [ecp, sECP] = useState(false);
+  const [edl, sEDL] = useState(false); const [edi, sEDI] = useState("wlan0mon"); const [edb, sEDB] = useState(""); const [edp, sEDP] = useState("50");
+  const [es, sES] = useState(null); const [el, sEL] = useState(false);
+  const [mi, sMI] = useState("wlan0"); const [mt, sMT] = useState(""); const [mg, sMG] = useState("192.168.0.1"); const [mp, sMP] = useState("8080"); const [mh, sMH] = useState(""); const [ms, sMS] = useState(null); const [ml, sML] = useState(false);
+  const ref = async () => { sES(await api("/attacks/evil-twin/status")); sMS(await api("/attacks/mitm/status")); };
+  useEffect(() => { ref(); }, []);
+  const sET = async () => { sEL(true); await api("/attacks/evil-twin/start", { method:"POST", body:JSON.stringify({ interface:ei, target_essid:ee, channel:parseInt(ec), internet_interface:en || null, captive_portal:ecp, deauth_legitimate:edl, deauth_interface:edl ? edi : null, deauth_bssid:edl ? edb : null, deauth_packets:parseInt(edp) }) }); await ref(); sEL(false); };
+  const xET = async () => { await api("/attacks/evil-twin/stop", { method:"POST" }); ref(); };
+  const sM = async () => { sML(true); await api("/attacks/mitm/start", { method:"POST", body:JSON.stringify({ interface:mi, target_ips:mt.split(",").map(s => s.trim()).filter(Boolean), gateway:mg, proxy_port:parseInt(mp), filter_hosts:mh ? mh.split(",").map(s => s.trim()) : [] }) }); await ref(); sML(false); };
+  const xM = async () => { await api("/attacks/mitm/stop", { method:"POST" }); ref(); };
+  return (
+    <div className="page-in">
+      <PageTitle sub="Evil Twin access point with integrated deauth, Man-in-the-Middle interception">Attack Vectors</PageTitle>
+      <Grid cols={2}>
+        <Card title="Evil Twin AP" color={C.warn} accent>
+          <Badge color={es?.active ? C.accent : C.textMuted}>{es?.active ? "ACTIVE" : "INACTIVE"}</Badge>
+          {!es?.active ? (
+            <div style={{ marginTop:12 }}>
+              <Input label="AP Interface" value={ei} onChange={sEI} />
+              <Input label="Target ESSID" value={ee} onChange={sEE} placeholder="Corp_WiFi" />
+              <Grid cols={2}><Input label="Channel" value={ec} onChange={sEC} /><Input label="Internet Iface" value={en} onChange={sEN} /></Grid>
+              <label style={{ fontFamily:font, fontSize:10, color:C.textMuted, display:"flex", gap:8, marginBottom:6, cursor:"pointer", alignItems:"center" }}>
+                <input type="checkbox" checked={ecp} onChange={e => sECP(e.target.checked)} /> Captive Portal
+              </label>
+              <label style={{ fontFamily:font, fontSize:10, color:C.textMuted, display:"flex", gap:8, marginBottom:8, cursor:"pointer", alignItems:"center" }}>
+                <input type="checkbox" checked={edl} onChange={e => sEDL(e.target.checked)} /> Deauth legitimate AP
+              </label>
+              {edl && (
+                <Grid cols={3}>
+                  <Input label="Deauth Interface" value={edi} onChange={sEDI} />
+                  <Input label="Legit AP BSSID" value={edb} onChange={sEDB} />
+                  <Input label="Pkts" value={edp} onChange={sEDP} />
+                </Grid>
+              )}
+              <Btn onClick={sET} disabled={el || !ee} color={C.warn}>
+                {el ? <><Spinner size={12} /> Launching...</> : "▶ Launch Evil Twin"}
+              </Btn>
+            </div>
+          ) : (
+            <div style={{ marginTop:12, fontFamily:font, fontSize:11, color:C.textMuted, lineHeight:1.8 }}>
+              {Object.entries(es.twin || {}).map(([k, v]) => (
+                <div key={k}>{k}: <span style={{ color:C.text }}>{String(v)}</span></div>
+              ))}
+              <Btn onClick={xET} danger sx={{ marginTop:10 }}>◼ Stop Evil Twin</Btn>
+            </div>
+          )}
+        </Card>
+        <Card title="Man-in-the-Middle" color={C.purple} accent>
+          <Badge color={ms?.active ? C.accent : C.textMuted}>{ms?.active ? "ACTIVE" : "INACTIVE"}</Badge>
+          {!ms?.active ? (
+            <div style={{ marginTop:12 }}>
+              <Input label="Interface" value={mi} onChange={sMI} />
+              <Input label="Target IPs (comma sep)" value={mt} onChange={sMT} placeholder="192.168.0.50" />
+              <Grid cols={2}><Input label="Gateway" value={mg} onChange={sMG} /><Input label="Proxy Port" value={mp} onChange={sMP} /></Grid>
+              <Input label="Filter Hosts" value={mh} onChange={sMH} placeholder="example.com" />
+              <Btn onClick={sM} disabled={ml || !mt} color={C.purple}>
+                {ml ? <><Spinner size={12} /></> : "▶ Start MITM"}
+              </Btn>
+            </div>
+          ) : (
+            <div style={{ marginTop:12, fontFamily:font, fontSize:11, color:C.textMuted, lineHeight:1.8 }}>
+              {Object.entries(ms.session || {}).map(([k, v]) => (
+                <div key={k}>{k}: <span style={{ color:C.text }}>{Array.isArray(v) ? v.join(", ") : String(v)}</span></div>
+              ))}
+              <Btn onClick={xM} danger sx={{ marginTop:10 }}>◼ Stop MITM</Btn>
+            </div>
+          )}
+        </Card>
+      </Grid>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PAGE: CAPTURES
+// ═══════════════════════════════════════════
+function CapturesPage() {
+  const C = useTheme();
+  const [files, setF] = useState([]); const [ld, setLd] = useState(false); const [checkR, setChk] = useState(null);
+  const load = async () => { setLd(true); const d = await api("/captures/"); if (Array.isArray(d)) setF(d); setLd(false); };
+  useEffect(() => { load(); }, []);
+  const check = async fp => { setChk(await api(`/captures/check-handshake?filepath=${encodeURIComponent(fp)}`, { method:"POST" })); };
+  const del = async fp => { if (confirm("Delete this capture file?")) await api(`/captures/?filepath=${encodeURIComponent(fp)}`, { method:"DELETE" }); load(); };
+  const cols = [
+    { key:"filename", label:"File", render:v => <span style={{ color:C.text, fontWeight:600 }}>{v}</span> },
+    { key:"file_type", label:"Type", render:v => <Badge color={C.info} sm>{v}</Badge> },
+    { key:"size_bytes", label:"Size", render:v => `${(v / 1024).toFixed(1)} KB` },
+    { key:"target_essid", label:"Target", render:v => v || "—" },
+    { key:"created_at", label:"Date", render:v => v ? new Date(v).toLocaleDateString() : "—" },
+    { key:"_", label:"", render:(_, r) => <Row gap={4}><Btn sm onClick={() => check(r.filepath)} color={C.info}>Check</Btn><Btn sm onClick={() => del(r.filepath)} danger>Del</Btn></Row> },
+  ];
+  return (
+    <div className="page-in">
+      <PageTitle sub="Manage capture files — .cap, .pcapng, .csv, .22000 — verify handshakes and PMKIDs">Capture Files</PageTitle>
+      <Btn onClick={load} disabled={ld} sx={{ marginBottom:14 }}>{ld ? <><Spinner size={12} /> Loading...</> : "↺ Refresh"}</Btn>
+      <Card title={`Files (${files.length})`}><Table cols={cols} data={files} /></Card>
+      {checkR && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.65)", backdropFilter:"blur(6px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100 }} onClick={() => setChk(null)}>
+          <div onClick={e => e.stopPropagation()} className="anim-up" style={{ background:C.bgCard, border:`1px solid ${C.accent}30`, borderRadius:8, padding:24, minWidth:420, maxWidth:600, boxShadow:`0 24px 80px rgba(0,0,0,.6)` }}>
+            <div style={{ fontFamily:fontDisplay, fontSize:14, color:C.accent, letterSpacing:".12em", textTransform:"uppercase", marginBottom:16, display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ width:6, height:6, background:C.accent, borderRadius:"50%", boxShadow:`0 0 8px ${C.accent}` }} />
+              Capture File Analysis
+            </div>
+            <div style={{ fontFamily:font, fontSize:12, color:C.textMuted, marginBottom:12, padding:"8px 12px", background:C.bgInput, borderRadius:4 }}>
+              {checkR.filepath}
+            </div>
+            <Grid cols={2}>
+              <div style={{ padding:"16px", background: checkR.has_handshake ? `${C.accent}08` : `${C.danger}06`, border:`1px solid ${checkR.has_handshake ? C.accent : C.danger}25`, borderRadius:6, textAlign:"center" }}>
+                <div style={{ fontSize:28, marginBottom:6 }}>{checkR.has_handshake ? "✓" : "✗"}</div>
+                <div style={{ fontFamily:fontDisplay, fontSize:11, color:checkR.has_handshake ? C.accent : C.danger, letterSpacing:".1em" }}>WPA HANDSHAKE</div>
+                <div style={{ fontFamily:font, fontSize:10, color:C.textMuted, marginTop:4 }}>{checkR.has_handshake ? "4-way handshake present — crackable" : "No handshake found"}</div>
+              </div>
+              <div style={{ padding:"16px", background: checkR.has_pmkid ? `${C.warn}08` : `${C.danger}06`, border:`1px solid ${checkR.has_pmkid ? C.warn : C.danger}25`, borderRadius:6, textAlign:"center" }}>
+                <div style={{ fontSize:28, marginBottom:6 }}>{checkR.has_pmkid ? "✓" : "✗"}</div>
+                <div style={{ fontFamily:fontDisplay, fontSize:11, color:checkR.has_pmkid ? C.warn : C.danger, letterSpacing:".1em" }}>PMKID</div>
+                <div style={{ fontFamily:font, fontSize:10, color:C.textMuted, marginTop:4 }}>{checkR.has_pmkid ? "PMKID present — crackable without clients" : "No PMKID found"}</div>
+              </div>
+            </Grid>
+            {checkR.networks_found > 0 && (
+              <div style={{ marginTop:10, fontFamily:font, fontSize:11, color:C.textMuted }}>Networks in file: <span style={{ color:C.accent }}>{checkR.networks_found}</span></div>
+            )}
+            {checkR.raw_output && (
+              <div style={{ marginTop:10 }}>
+                <div style={{ fontSize:9, fontFamily:fontDisplay, color:C.textMuted, textTransform:"uppercase", letterSpacing:".12em", marginBottom:4 }}>Raw Output</div>
+                <div style={{ fontFamily:font, fontSize:10, color:C.text, background:C.bgInput, borderRadius:4, padding:"8px 10px", maxHeight:120, overflowY:"auto", whiteSpace:"pre-wrap", wordBreak:"break-all", lineHeight:1.5 }}>
+                  {checkR.raw_output}
                 </div>
               </div>
-            ))}
-            {sessions.length === 0 && <div style={{ color: t.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11, padding: 12, textAlign: "center" }}>// no sessions</div>}
+            )}
+            <Btn onClick={() => setChk(null)} sx={{ marginTop:14, width:"100%" }}>Close</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PAGE: SESSIONS
+// ═══════════════════════════════════════════
+function SessionsPage() {
+  const C = useTheme();
+  const [ss, sSs] = useState([]); const [sel, sSel] = useState(null); const [rpt, sRpt] = useState(null);
+  const [nm, sNm] = useState(""); const [co, sCo] = useState(""); const [au, sAu] = useState(""); const [nt, sNt] = useState("");
+  const [fc, sFc] = useState("wifi"); const [fs, sFs] = useState("medium"); const [ft, sFt] = useState(""); const [fd, sFd] = useState(""); const [fe, sFe] = useState(""); const [fr, sFr] = useState("");
+  const ref = async () => { const d = await api("/sessions/"); if (Array.isArray(d)) sSs(d); };
+  useEffect(() => { ref(); }, []);
+  const ld = async id => { sSel(await api(`/sessions/${id}`)); sRpt(null); };
+  const cr = async () => { await api("/sessions/", { method:"POST", body:JSON.stringify({ name:nm, company:co, auditor:au, notes:nt || null }) }); sNm(""); sCo(""); sAu(""); sNt(""); ref(); };
+  const af = async () => { if (!sel) return; await api(`/sessions/${sel.id}/findings`, { method:"POST", body:JSON.stringify({ session_id:sel.id, category:fc, severity:fs, title:ft, description:fd, evidence:fe || null, recommendation:fr || null }) }); sFt(""); sFd(""); sFe(""); sFr(""); ld(sel.id); };
+  const cl = async id => { await api(`/sessions/${id}/close`, { method:"POST" }); ref(); if (sel?.id === id) ld(id); };
+  const ex = async id => sRpt(await api(`/sessions/${id}/report`));
+  return (
+    <div className="page-in">
+      <PageTitle sub="Document findings, manage audit sessions, generate severity-sorted reports">Audit Sessions</PageTitle>
+      <div style={{ display:"grid", gridTemplateColumns:"340px 1fr", gap:16 }}>
+        <div>
+          <Card title="New Session" color={C.accent} accent>
+            <Input label="Session Name" value={nm} onChange={sNm} placeholder="WiFi Audit Q1 2026" />
+            <Input label="Company" value={co} onChange={sCo} placeholder="Acme Corp" />
+            <Input label="Auditor" value={au} onChange={sAu} placeholder="Your Name" />
+            <Input label="Notes (optional)" value={nt} onChange={sNt} placeholder="Scope, objectives..." />
+            <Btn onClick={cr} disabled={!nm || !co || !au} sx={{ width:"100%" }}>+ Create Session</Btn>
+          </Card>
+          <Card title={`Sessions (${ss.length})`}>
+            {ss.length === 0 && <div style={{ color:C.textMuted, fontFamily:font, fontSize:11, padding:10, textAlign:"center" }}>No sessions yet</div>}
+            {ss.map(s => {
+              const active = sel?.id === s.id;
+              const findingCount = s.findings?.length || 0;
+              return (
+                <div key={s.id} onClick={() => ld(s.id)} className="card-hover" style={{
+                  padding:"10px 14px", background: active ? `${C.accent}0a` : C.bgInput,
+                  border:`1px solid ${active ? C.accent + "35" : C.border}`,
+                  borderRadius:6, marginBottom:6, cursor:"pointer", fontFamily:font,
+                  transition:"all .18s", position:"relative", overflow:"hidden",
+                }}>
+                  {active && <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, background:C.accent, boxShadow:`0 0 8px ${C.accent}` }} />}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                    <div>
+                      <div style={{ color:C.text, fontSize:12, fontWeight:700, marginBottom:3 }}>{s.name}</div>
+                      <div style={{ color:C.textMuted, fontSize:10 }}>{s.company} · {s.auditor}</div>
+                    </div>
+                    <div style={{ textAlign:"right" }}>
+                      <Badge color={s.status === "active" ? C.accent : C.textMuted} sm>{s.status}</Badge>
+                      {findingCount > 0 && <div style={{ color:C.textMuted, fontSize:9, marginTop:3 }}>{findingCount} findings</div>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </Card>
         </div>
         <div>
           {sel ? (
             <>
-              <Card title={sel.name} color="accent">
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.textMuted, lineHeight: 2, marginBottom: 12 }}>
-                  {[["ID", sel.id], ["Company", sel.company], ["Auditor", sel.auditor]].map(([k, v]) => (
-                    <div key={k} style={{ display: "flex", gap: 12 }}>
-                      <span style={{ color: t.textDim, minWidth: 70 }}>{k}</span>
-                      <span style={{ color: t.textBright }}>{v}</span>
+              {/* Session header card */}
+              <div className="anim-up" style={{ padding:"16px 20px", marginBottom:14, borderRadius:8, background:`${C.accent}06`, border:`1px solid ${C.accent}20`, position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", top:0, left:0, right:0, height:2, background:`linear-gradient(90deg, ${C.accent}60, transparent)` }} />
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div>
+                    <div style={{ fontFamily:fontDisplay, fontSize:16, color:C.accent, fontWeight:700, letterSpacing:".06em" }}>{sel.name}</div>
+                    <div style={{ fontFamily:font, fontSize:12, color:C.textMuted, marginTop:4 }}>
+                      {sel.company} · {sel.auditor} · ID: {sel.id}
                     </div>
-                  ))}
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <span style={{ color: t.textDim, minWidth: 70 }}>Status</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}><StatusDot color={sel.status === "active" ? "green" : "textDim"} /><Badge color={sel.status === "active" ? "green" : "textDim"} small>{sel.status}</Badge></div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <Badge color={sel.status === "active" ? C.accent : C.textMuted}>{sel.status}</Badge>
+                    <div style={{ fontFamily:fontDisplay, fontSize:18, color:C.accent, fontWeight:700, marginTop:4 }}>{sel.findings?.length || 0}</div>
+                    <div style={{ fontFamily:font, fontSize:9, color:C.textMuted, textTransform:"uppercase" }}>findings</div>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {sel.status === "active" && <Btn small onClick={async () => { await api(`/sessions/${sel.id}/close`, { method: "POST" }); refresh(); select(sel.id); }} color="yellow">◼ Close</Btn>}
-                  <Btn small onClick={async () => setReport(await api(`/sessions/${sel.id}/report`))} color="blue">↓ Report</Btn>
-                </div>
-              </Card>
+                <Row gap={6} sx={{ marginTop:12 }}>
+                  {sel.status === "active" && <Btn sm onClick={() => cl(sel.id)} color={C.warn}>Close Session</Btn>}
+                  <Btn sm onClick={() => ex(sel.id)} color={C.info}>Export Report</Btn>
+                </Row>
+              </div>
               {sel.status === "active" && (
-                <Card title="Add Finding" color="yellow">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <Select label="Category" value={fCat} onChange={setFCat} options={catOpts} />
-                    <Select label="Severity" value={fSev} onChange={setFSev} options={sevOpts} />
-                  </div>
-                  <Input label="Title" value={fT} onChange={setFT} />
-                  <Input label="Description" value={fD} onChange={setFD} />
-                  <Input label="Evidence" value={fE} onChange={setFE} />
-                  <Input label="Recommendation" value={fR} onChange={setFR} />
-                  <Btn onClick={async () => { await api(`/sessions/${sel.id}/findings`, { method: "POST", body: JSON.stringify({ session_id: sel.id, category: fCat, severity: fSev, title: fT, description: fD, evidence: fE || null, recommendation: fR || null }) }); setFT(""); setFD(""); setFE(""); setFR(""); select(sel.id); }} disabled={!fT || !fD} color="yellow">+ Add Finding</Btn>
+                <Card title="Add Finding" color={C.warn} accent>
+                  <Grid cols={2}>
+                    <Select label="Category" value={fc} onChange={sFc} options={[{ value:"wifi", label:"WiFi" }, { value:"network", label:"Network" }, { value:"router", label:"Router" }, { value:"credentials", label:"Credentials" }, { value:"encryption", label:"Encryption" }, { value:"access_control", label:"Access Control" }, { value:"other", label:"Other" }]} />
+                    <Select label="Severity" value={fs} onChange={sFs} options={[{ value:"critical", label:"Critical" }, { value:"high", label:"High" }, { value:"medium", label:"Medium" }, { value:"low", label:"Low" }, { value:"info", label:"Info" }]} />
+                  </Grid>
+                  <Input label="Title" value={ft} onChange={sFt} />
+                  <Input label="Description" value={fd} onChange={sFd} />
+                  <Input label="Evidence" value={fe} onChange={sFe} />
+                  <Input label="Recommendation" value={fr} onChange={sFr} />
+                  <Btn onClick={af} disabled={!ft || !fd} color={C.warn}>+ Add Finding</Btn>
                 </Card>
               )}
               {sel.findings?.length > 0 && (
-                <Card title={`Findings (${sel.findings.length})`}>
+                <Card title={`Findings (${sel.findings.length})`} accent>
+                  {/* Severity summary bar */}
+                  <div style={{ display:"flex", gap:3, marginBottom:12, borderRadius:4, overflow:"hidden", height:6 }}>
+                    {["critical","high","medium","low","info"].map(sev => {
+                      const count = sel.findings.filter(f => f.severity === sev).length;
+                      return count > 0 ? <div key={sev} style={{ flex:count, background:SEV[sev], minWidth:2 }} /> : null;
+                    })}
+                  </div>
                   {sel.findings.map((f, i) => (
-                    <div key={i} style={{
-                      padding: "12px 14px", background: t.bgTableRow,
-                      borderLeft: `3px solid ${tc(t, SEV[f.severity] || "textDim")}`,
-                      borderRadius: 6, marginBottom: 8, fontFamily: "'Space Mono', monospace",
+                    <div key={i} className="anim-up card-hover" style={{
+                      padding:"12px 16px", background:C.bgInput,
+                      borderLeft:`4px solid ${SEV[f.severity] || C.textMuted}`,
+                      borderRadius:4, marginBottom:8, fontFamily:font, fontSize:12,
+                      border:`1px solid ${C.border}40`,
+                      boxShadow:`inset 0 0 20px ${SEV[f.severity]}06`,
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                        <span style={{ color: t.textBright, fontSize: 12, fontWeight: 700 }}>{f.title}</span>
-                        <Badge color={SEV[f.severity] || "textDim"} small>{f.severity}</Badge>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                        <span style={{ color:C.text, fontWeight:700, fontSize:13 }}>{f.title}</span>
+                        <Row gap={4}>
+                          <Badge color={C.textMuted} sm>{f.category}</Badge>
+                          <Badge color={SEV[f.severity]}>{f.severity}</Badge>
+                        </Row>
                       </div>
-                      <div style={{ color: t.textMuted, fontSize: 11, marginBottom: 6 }}>{f.description}</div>
-                      {f.recommendation && <div style={{ color: t.green, fontSize: 10 }}>→ {f.recommendation}</div>}
-                      <div style={{ marginTop: 6 }}><Badge color="blue" small>{f.category}</Badge></div>
+                      <div style={{ color:C.textMuted, lineHeight:1.6 }}>{f.description}</div>
+                      {f.evidence && <div style={{ color:C.info, fontSize:11, marginTop:6 }}>📁 Evidence: {f.evidence}</div>}
+                      {f.recommendation && <div style={{ color:C.accent, fontSize:11, marginTop:4, padding:"6px 10px", background:`${C.accent}06`, borderRadius:3, borderLeft:`2px solid ${C.accent}40` }}>💡 {f.recommendation}</div>}
+                      {f.timestamp && <div style={{ color:C.textDim, fontSize:9, marginTop:6 }}>{new Date(f.timestamp).toLocaleString()}</div>}
                     </div>
                   ))}
                 </Card>
               )}
-              {report && (
-                <Card title="Audit Report" color="green">
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    {Object.entries(report.audit_report?.summary || {}).filter(([k]) => k !== "total").map(([s, c]) => (
-                      <Stat key={s} label={s} value={c} color={SEV[s] || "textDim"} />
+              {rpt && (
+                <Card title="Audit Report Summary" color={C.accent} accent>
+                  <div style={{ textAlign:"center", marginBottom:14 }}>
+                    <div style={{ fontFamily:fontDisplay, fontSize:32, color:C.accent, fontWeight:900 }}>{rpt.audit_report?.summary?.total || 0}</div>
+                    <div style={{ fontFamily:font, fontSize:10, color:C.textMuted, textTransform:"uppercase", letterSpacing:".15em" }}>Total Findings</div>
+                  </div>
+                  <Row gap={10} wrap>
+                    {Object.entries(rpt.audit_report?.summary || {}).filter(([k]) => k !== "total").map(([s, c]) => (
+                      <Stat key={s} label={s} value={c} color={SEV[s] || C.textMuted} />
                     ))}
+                  </Row>
+                  <div style={{ marginTop:10, fontFamily:font, fontSize:10, color:C.textMuted }}>
+                    Generated: {rpt.audit_report?.generated_at ? new Date(rpt.audit_report.generated_at).toLocaleString() : "—"}
                   </div>
                 </Card>
               )}
             </>
           ) : (
-            <div style={{ color: t.textDim, fontFamily: "'Space Mono', monospace", padding: 60, textAlign: "center", fontSize: 11 }}>
-              ← Select or create a session to begin
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:60, color:C.textMuted }}>
+              <div style={{ fontSize:40, marginBottom:12, opacity:.3 }}>📋</div>
+              <div style={{ fontFamily:fontDisplay, fontSize:13, letterSpacing:".12em", textTransform:"uppercase" }}>No Session Selected</div>
+              <div style={{ fontFamily:font, fontSize:11, marginTop:6 }}>Create or select a session from the left panel</div>
             </div>
           )}
         </div>
@@ -959,273 +1642,350 @@ function SessionsPage() {
   );
 }
 
+// ═══════════════════════════════════════════
+// PAGE: PROCESSES
+// ═══════════════════════════════════════════
 function ProcessesPage() {
-  const t = useTheme();
-  const [procs, setProcs] = useState([]); const [ld, setLd] = useState(false);
-  const refresh = async () => { setLd(true); const d = await api("/system/processes"); if (Array.isArray(d)) setProcs(d); setLd(false); };
-  useEffect(() => { refresh(); const i = setInterval(refresh, 5000); return () => clearInterval(i); }, []);
+  const C = useTheme();
+  const [ps, sPs] = useState([]); const [ld, sLd] = useState(false);
+  const ref = async () => { sLd(true); const d = await api("/system/processes"); if (Array.isArray(d)) sPs(d); sLd(false); };
+  useEffect(() => { ref(); const i = setInterval(ref, 5000); return () => clearInterval(i); }, []);
+  const kill = async id => { await api(`/system/processes/${id}/cancel`, { method:"POST" }); ref(); };
   const cols = [
-    { key: "id", label: "ID", render: v => <span style={{ color: t.accent, fontWeight: 700 }}>{v}</span> },
-    { key: "command", label: "Command", render: v => <code style={{ color: t.textBright, fontSize: 10, maxWidth: 360, display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</code> },
-    { key: "status", label: "Status", render: v => <div style={{ display: "flex", alignItems: "center", gap: 6 }}><StatusDot color={v === "running" ? "green" : v === "completed" ? "blue" : "red"} /><Badge color={v === "running" ? "green" : v === "completed" ? "blue" : "red"} small>{v}</Badge></div> },
-    { key: "return_code", label: "RC", render: v => v !== null ? <span style={{ color: v === 0 ? t.green : t.red }}>{v}</span> : <span style={{ color: t.textDim }}>—</span> },
-    { key: "started_at", label: "Started", render: v => v ? <span style={{ color: t.textMuted, fontSize: 10 }}>{new Date(v).toLocaleTimeString()}</span> : "—" },
-    { key: "_a", label: "", render: (_, r) => r.status === "running" ? <Btn small danger onClick={async () => { await api(`/system/processes/${r.id}/cancel`, { method: "POST" }); refresh(); }}>✕ Kill</Btn> : null },
+    { key:"id", label:"ID", render:v => <span style={{ color:C.accent, fontFamily:fontDisplay, fontSize:9 }}>{v}</span> },
+    { key:"command", label:"Command", render:v => <span style={{ color:C.text, maxWidth:350, display:"inline-block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v}</span> },
+    { key:"status", label:"Status", render:v => <Badge color={v === "running" ? C.accent : v === "completed" ? C.info : C.danger} sm>{v}</Badge> },
+    { key:"return_code", label:"RC", render:v => v !== null ? v : "—" },
+    { key:"started_at", label:"Started", render:v => v ? new Date(v).toLocaleTimeString() : "—" },
+    { key:"_", label:"", render:(_, r) => r.status === "running" ? <Btn sm danger onClick={() => kill(r.id)}>Kill</Btn> : null },
   ];
   return (
-    <div className="page-content">
-      <GlitchText text="// PROCESSES" />
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <Stat label="Total" value={procs.length} color="accent" icon="▣" />
-        <Stat label="Running" value={procs.filter(p => p.status === "running").length} color="green" icon="◉" />
-        <Stat label="Failed" value={procs.filter(p => p.status === "failed").length} color="red" icon="✗" />
-        <Stat label="Completed" value={procs.filter(p => p.status === "completed").length} color="blue" icon="✓" />
-      </div>
-      <Card title="Managed Processes">
-        <DataTable columns={cols} data={procs} />
-      </Card>
-      <Btn onClick={refresh} disabled={ld}>{ld ? "⟳ Refreshing..." : "↺ Refresh"}</Btn>
+    <div className="page-in">
+      <PageTitle sub="Monitor and manage all background processes — airodump, nmap, hostapd, mitmproxy">Processes</PageTitle>
+      <Row gap={10} sx={{ marginBottom:14 }} wrap>
+        <Stat label="Total" value={ps.length} color={C.info} />
+        <Stat label="Running" value={ps.filter(p => p.status === "running").length} color={C.accent} />
+        <Stat label="Failed" value={ps.filter(p => p.status === "failed").length} color={C.danger} />
+      </Row>
+      <Card title="Managed Processes"><Table cols={cols} data={ps} /></Card>
+      <Btn onClick={ref} disabled={ld} sx={{ marginTop:8 }}>↺ Refresh</Btn>
     </div>
   );
 }
 
-// ═══════ HELP PAGE ═══════
-
-const HELP = [
-  { id: "overview", title: "Visión General", icon: "📖", text: `**WFAudit** es una herramienta de auditoría WiFi profesional. Proporciona una interfaz gráfica sobre herramientas estándar (aircrack-ng, nmap, mitmproxy, hostapd) para ejecutar auditorías WiFi completas.\n\nLas 4 fases de auditoría:\n1. **Reconocimiento WiFi** — Escanear el espectro y descubrir redes\n2. **Análisis de red** — Mapear la red interna y sus servicios\n3. **Explotación** — Cracking WPA, Evil Twin, acceso al router\n4. **Interceptación** — Man-in-the-Middle para análisis de tráfico\n\nTodo bajo un marco de sesiones con sistema de hallazgos e informes.` },
-  { id: "prereqs", title: "Requisitos Previos", icon: "⚙", text: `**Hardware necesario:**\n• Adaptador WiFi con soporte modo monitor (chipsets Atheros AR9271, Ralink RT3070, Realtek RTL8812AU)\n• Para Evil Twin: **dos** tarjetas WiFi\n• Conexión Ethernet recomendada\n\n**Software:**\n• Linux (Kali recomendado)\n• Python 3.11+\n• Herramientas: aircrack-ng, nmap, hostapd, dnsmasq, macchanger, mitmproxy\n• Ejecutar como **root**\n\n**Legal:**\n• Contrato de auditoría firmado\n• Alcance definido por escrito\n• Nunca auditar redes sin autorización` },
-  { id: "system", title: "System", icon: "◉", text: `Tu punto de partida. El **Preflight Check** verifica:\n\n• Si estás ejecutando como root (obligatorio)\n• Qué herramientas están instaladas y cuáles faltan\n• Sistema operativo y arquitectura\n\n**READY** = todo listo. **NOT READY** = revisa las herramientas faltantes.\n\nEjecuta el Preflight **siempre** antes de empezar una auditoría.` },
-  { id: "interfaces", title: "Interfaces", icon: "⚡", text: `Gestiona adaptadores WiFi:\n\n**Listar** — Nombre, MAC, driver, chipset, modo y estado.\n\n**Modo monitor** — Obligatorio para escanear. Ejecuta \`airmon-ng start\`. La interfaz se renombra a wlan0mon.\n\n**Modo managed** — Restaura WiFi normal con \`airmon-ng stop\`.\n\n**Cambiar MAC** — Aleatorio o manual. Útil para evitar detección.` },
-  { id: "wifiscan", title: "WiFi Scanner", icon: "📡", text: `Descubre redes con airodump-ng:\n\n**Parámetros:** Interface (en monitor), Canal (vacío=todos), Duración, BSSID objetivo (opcional).\n\n**Resultados por red:**\n• **ESSID** — Nombre de la red\n• **BSSID** — MAC del AP\n• **Power** — Señal dBm (verde >-50, amarillo >-70, rojo <-70)\n• **Security** — Open, WEP, WPA, WPA2, WPA3\n• **WPS** — Si activo, vector de ataque adicional\n• **Clients** — Dispositivos conectados` },
-  { id: "handshake", title: "Handshake & Crack", icon: "🔓", text: `Captura y crackea contraseñas WPA/WPA2:\n\n**Fase 1 — Capturar handshake:**\nEl handshake son 4 paquetes al conectarse un cliente.\n• "Deauth first" desconecta clientes para forzar reconexión\n• Si hay ✓ HANDSHAKE CAPTURED, el .cap se guarda\n\n**Fase 2 — Crackear:**\n• \`rockyou.txt\` = 14 millones de passwords\n• ✓ KEY FOUND = contraseña encontrada\n\n**Deauth Tool:** envía desconexiones para probar resiliencia DoS.` },
-  { id: "recon", title: "Network Recon", icon: "🔍", text: `Mapea la red con nmap:\n\n**Tipos de escaneo:**\n• **Quick** — Ping sweep, descubre hosts vivos\n• **Full** — 65535 puertos + servicios + OS\n• **Vuln** — Scripts de vulnerabilidades\n• **Stealth** — SYN scan sigiloso\n• **Custom** — Argumentos nmap propios\n\n**Router Probe (CTF):**\nSondea el router: HTTP, HTTPS, SSH, Telnet.\n• Telnet abierto = hallazgo crítico` },
-  { id: "attacks", title: "Attack Vectors", icon: "⚔", text: `**Evil Twin:**\nAP falso con el mismo nombre que la red objetivo.\n• Necesita 2ª tarjeta WiFi\n• Captive Portal redirige DNS a tu IP\n• Internamente: hostapd + dnsmasq + iptables NAT\n\n**MITM:**\n• ARP spoofing engaña dispositivos\n• mitmproxy captura flujos HTTP/S\n• HTTPS muestra warnings de certificado` },
-  { id: "sessions", title: "Audit Sessions", icon: "📋", text: `Gestión de la auditoría:\n\n**Crear sesión:** nombre, empresa, auditor, notas.\n\n**Registrar hallazgos:**\n• **Severity** — Critical/High/Medium/Low/Info\n• **Evidence** — Ruta a capturas\n• **Recommendation** — Solución propuesta\n\n**Ejemplos:**\n• 🔴 Critical: Red sin cifrado → Implementar WPA3\n• 🟠 High: Password crackeada → Passphrase 16+ chars\n• 🔵 Low: WPS activado → Desactivar WPS` },
-  { id: "processes", title: "Processes", icon: "▣", text: `Monitoriza subprocesos:\n\n• **Status:** running, completed, failed, cancelled\n• **Kill:** mata procesos colgados\n• Auto-refresh cada 5 segundos\n\nSi algo falla, revisa aquí.` },
-  { id: "workflow", title: "Flujo Completo", icon: "🗺", text: `**ANTES del sitio:**\n1. ✅ Contrato y alcance firmados\n2. ✅ Hardware verificado\n3. ✅ Preflight OK\n\n**Fase 1 — Reconocimiento:**\n4. Interfaces → Monitor Mode\n5. WiFi Scanner → Scan 60s\n\n**Fase 2 — Cracking:**\n6. Handshake → Capturar\n7. Crack con wordlist\n\n**Fase 3 — Red interna:**\n8. Recon → Discover\n9. Router Probe\n\n**Después:**\n10. Revisar findings\n11. Exportar informe` },
-  { id: "glossary", title: "Glosario", icon: "📚", text: `• **AP** — Access Point\n• **BSSID** — MAC del AP\n• **ESSID** — Nombre de la red WiFi\n• **Handshake** — 4 paquetes WPA con hash\n• **Deauth** — Paquete que fuerza desconexión\n• **Modo Monitor** — Captura todos los paquetes\n• **WPA/WPA2/WPA3** — Protocolos de cifrado\n• **WPS** — WiFi Protected Setup, vulnerable\n• **Evil Twin** — AP falso que imita una red\n• **MITM** — Man-in-the-Middle\n• **ARP Spoofing** — Engañar dispositivos\n• **CTF** — Capture The Flag\n• **Wordlist** — Diccionario de contraseñas` },
-];
-
+// ═══════════════════════════════════════════
+// PAGE: HELP
+// ═══════════════════════════════════════════
 function HelpPage() {
-  const t = useTheme();
-  const [active, setActive] = useState("overview");
-  const sec = HELP.find(s => s.id === active);
-  const renderMd = (text) => text.split("\n").map((line, i) => {
-    if (line.startsWith("**") && line.endsWith("**")) return <div key={i} style={{ color: t.accent, fontSize: 11, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, letterSpacing: "0.12em", marginTop: 16, marginBottom: 8, textTransform: "uppercase" }}>{line.replace(/\*\*/g, "")}</div>;
-    if (line.startsWith("• **")) { const m = line.match(/• \*\*(.+?)\*\*\s*—?\s*(.*)/); if (m) return <div key={i} style={{ paddingLeft: 14, marginBottom: 5, fontSize: 12, lineHeight: 1.8 }}><span style={{ color: t.accent }}>▸ </span><span style={{ color: t.textBright, fontWeight: 700 }}>{m[1]}</span>{m[2] && <span style={{ color: t.text }}> — {m[2]}</span>}</div>; }
-    if (line.startsWith("• ")) return <div key={i} style={{ paddingLeft: 14, marginBottom: 4, fontSize: 12, lineHeight: 1.8, color: t.text }}><span style={{ color: t.accent }}>▸ </span>{renderInline(line.slice(2))}</div>;
-    const nm = line.match(/^(\d+)\.\s+(.*)/); if (nm) return <div key={i} style={{ paddingLeft: 14, marginBottom: 4, fontSize: 12, lineHeight: 1.8, color: t.text }}><span style={{ color: t.yellow, marginRight: 8, fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>{nm[1]}.</span>{renderInline(nm[2])}</div>;
-    if (line.startsWith("→")) return <div key={i} style={{ paddingLeft: 24, marginBottom: 3, fontSize: 11, color: t.green, lineHeight: 1.8, fontFamily: "'Space Mono', monospace" }}>{line}</div>;
-    if (line.trim() === "") return <div key={i} style={{ height: 10 }} />;
-    return <div key={i} style={{ fontSize: 12.5, lineHeight: 1.9, color: t.text, marginBottom: 2 }}>{renderInline(line)}</div>;
-  });
-  const renderInline = (txt) => {
-    const parts = []; let rem = txt; let k = 0;
-    while (rem.length > 0) {
-      const bm = rem.match(/\*\*(.+?)\*\*/); const cm = rem.match(/`(.+?)`/);
-      let fm = null, mt = null;
-      if (bm && (!cm || bm.index <= cm.index)) { fm = bm; mt = "b"; } else if (cm) { fm = cm; mt = "c"; }
-      if (!fm) { parts.push(<span key={k++}>{rem}</span>); break; }
-      if (fm.index > 0) parts.push(<span key={k++}>{rem.slice(0, fm.index)}</span>);
-      if (mt === "b") parts.push(<span key={k++} style={{ color: t.textBright, fontWeight: 700 }}>{fm[1]}</span>);
-      if (mt === "c") parts.push(<code key={k++} style={{ background: "rgba(0,229,255,0.08)", padding: "1px 7px", borderRadius: 4, fontSize: 10, color: t.green, fontFamily: "'Space Mono', monospace", border: `1px solid rgba(0,229,255,0.15)` }}>{fm[1]}</code>);
-      rem = rem.slice(fm.index + fm[0].length);
-    }
-    return parts;
-  };
+  const C = useTheme();
+  const [open, setOpen] = useState(null);
+  const tog = id => setOpen(open === id ? null : id);
+  const A = ({ children }) => <span style={{ color:C.accent, fontWeight:600 }}>{children}</span>;
+  const P = ({ children }) => <p style={{ color:C.textMuted, fontSize:11, lineHeight:1.8, margin:"5px 0", fontFamily:font }}>{children}</p>;
+  const Cd = ({ children }) => <code style={{ background:C.bgInput, padding:"2px 6px", borderRadius:2, fontSize:10, fontFamily:font, color:C.accent, border:`1px solid ${C.border}` }}>{children}</code>;
+
+  const secs = [
+    { id:"overview", title:"What is WFAudit?", c:() => <div><P>WFAudit is a professional WiFi security auditing platform that orchestrates industry-standard tools (aircrack-ng, nmap, hostapd, mitmproxy, hcxdumptool, hashcat, freeradius) through a REST API. It covers the full penetration testing lifecycle: reconnaissance → vulnerability assessment → exploitation → post-exploitation → reporting.</P><P><span style={{ color:C.danger }}>⚠ LEGAL:</span> Only use under a signed audit contract. Unauthorized use is illegal.</P></div> },
+    { id:"workflow", title:"Recommended Audit Workflow", c:() => <div>{[["1","System Overview","Run preflight checks — verify root, tools, system readiness"],["2","Create Session","Start documentation before any scanning"],["3","Interfaces","Select WiFi adapter, enable monitor mode"],["4","WiFi Scan (dual-band)","Discover all networks on 2.4 GHz + 5 GHz simultaneously"],["5","PNL Analysis","Identify Evil Twin candidates from client probe requests"],["6","PMKID (try first)","Clientless attack — no connected clients needed"],["7","Handshake Capture","If PMKID fails, capture handshake with deauth"],["8","AP-Less Honeypot","If no clients present, create honeypot for probing devices"],["9","Enterprise Attack","If WPA2-Enterprise, deploy rogue RADIUS"],["10","WPA3 Check","If WPA3, check transition mode for downgrade"],["11","Network Recon","Map internal network after gaining access"],["12","Router Probe","CTF — attempt admin panel access"],["13","Document Findings","Record every discovery with severity and recommendation"],["14","Export Report","Generate final audit report"]].map(([n,t,d]) => <div key={n} style={{ fontFamily:font, fontSize:11, lineHeight:2.1, color:C.text, display:"flex", gap:10, alignItems:"flex-start" }}><Badge color={C.accent} sm>{n}</Badge><span><A>{t}</A> — {d}</span></div>)}</div> },
+    { id:"interfaces", title:"Interfaces — WiFi Adapter Management", c:() => <div><P><A>Monitor Mode</A> is required for ALL WiFi scanning and attacks. In managed mode, your adapter only processes packets addressed to it. In monitor mode, it captures ALL WiFi packets from the air.</P><P><A>MAC Spoofing</A> changes your adapter's MAC address. Three modes: random (default), specific MAC, or vendor-spoofed (mimics a specific manufacturer).</P><P><A>5 GHz Support</A> — Many enterprise networks use 5 GHz. Your adapter must support it (Alfa AWUS036ACH recommended).</P><P><span style={{ color:C.danger }}>⚠</span> Enabling monitor mode disconnects your WiFi. Use Ethernet cable.</P></div> },
+    { id:"scanner", title:"WiFi Scanner — Network Discovery", c:() => <div><P>Uses <Cd>airodump-ng</Cd> to scan WiFi airwaves. Captures beacon frames from APs and probe requests from clients.</P><P><A>Band Selection</A> — <Cd>bg</Cd> = 2.4 GHz only, <Cd>a</Cd> = 5 GHz only, <Cd>abg</Cd> = dual-band scan. Always use dual-band for complete coverage.</P><P><A>PNL Analysis</A> — Analyzes probe requests from all detected clients. Identifies which SSIDs clients are searching for, especially SSIDs that don't match any visible AP — these are perfect Evil Twin candidates.</P></div> },
+    { id:"handshake", title:"Handshake & Crack — WPA/WPA2 Audit", c:() => <div><P><A>The WPA 4-Way Handshake</A> is exchanged when a client connects to a WPA2-PSK AP. It contains a hash of the password that can be cracked offline with a dictionary.</P><P><A>Step 1 — Capture:</A> <Cd>airodump-ng</Cd> listens on the target's channel. When a client (re)connects, the handshake is captured in a .cap file.</P><P><A>Step 2 — Deauth:</A> <Cd>aireplay-ng</Cd> sends deauthentication packets to force clients to reconnect.</P><P><A>Step 3 — Crack:</A> <Cd>aircrack-ng</Cd> tests each word in a dictionary against the captured handshake. Common wordlist: <Cd>rockyou.txt</Cd> (~14M passwords).</P></div> },
+    { id:"pmkid", title:"PMKID — Clientless WPA2 Attack", c:() => <div><P><A>Try this FIRST</A> in any WPA2 audit. The PMKID is a hash found in the AP's first EAPOL message during authentication. You don't need any connected clients — just the AP.</P><P><A>Two capture methods:</A></P><P>• <Cd>hcxdumptool</Cd> (preferred) — Creates .pcapng files, converted to hashcat .22000 format with <Cd>hcxpcapngtool</Cd></P><P>• <Cd>airodump-ng</Cd> (fallback) — Also captures PMKIDs. Shows "PMKID" in the Notes column when found.</P></div> },
+    { id:"attacks", title:"Evil Twin & MITM", c:() => <div><P><A>Evil Twin:</A> Creates a fake AP with the same ESSID. Key features in v2:</P><P>• Captive portal — Redirect all DNS to your machine for fake login pages</P><P>• Internet forwarding — Give victims internet through your machine (via iptables NAT)</P><P>• <A>Integrated deauth</A> — Simultaneously deauth the legitimate AP to force clients to your Evil Twin</P><P><A>MITM:</A> After Evil Twin or on the same network, intercept traffic between targets and the gateway using ARP spoofing with <Cd>arpspoof</Cd> and <Cd>mitmproxy</Cd>.</P></div> },
+    { id:"sessions", title:"Sessions & Reporting", c:() => <div><P>Every finding must be documented with: <A>Category</A> (wifi, network, router, credentials, encryption, access_control), <A>Severity</A> (critical, high, medium, low, info), title, description, evidence (file paths, screenshots), and remediation recommendation.</P><P>The <A>Export Report</A> generates a JSON summary with findings grouped by severity and numerical counts — ready for the final audit deliverable.</P></div> },
+    { id:"tips", title:"Tips for Your First WiFi Audit", c:() => <div><P><A>Preparation:</A> Bring 2+ USB WiFi adapters, Ethernet cable, Kali Linux on USB, custom wordlists. Document the scope: which networks, which hours, what limits.</P><P><A>Order of attacks for WPA2:</A> PMKID first (fastest, no clients needed) → Handshake + deauth → AP-less honeypot → Evil Twin</P><P><A>Common mistakes:</A> Forgetting monitor mode · Not having root · Only scanning 2.4 GHz · Using only rockyou.txt · Not documenting findings in real-time · Forgetting to restore managed mode when done</P><P><A>WPA3?</A> Check transition mode first. If WPA3-only, it's a positive finding.</P><P><A>Open networks?</A> Critical finding. All traffic in plaintext. Document immediately.</P></div> },
+  ];
+
   return (
-    <div className="page-content">
-      <GlitchText text="// HELP & DOCUMENTATION" />
-      <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 20 }}>
-        <Card title="Contents">
-          {HELP.map(s => (
-            <div key={s.id} onClick={() => setActive(s.id)}
-              style={{
-                padding: "8px 12px", background: active === s.id ? t.accentDim : "transparent",
-                borderLeft: active === s.id ? `2px solid ${t.accent}` : "2px solid transparent",
-                borderRadius: 4, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-                fontSize: 11, color: active === s.id ? t.accent : t.textMuted,
-                marginBottom: 2, display: "flex", gap: 8, alignItems: "center",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { if (active !== s.id) e.currentTarget.style.color = t.textBright; }}
-              onMouseLeave={e => { if (active !== s.id) e.currentTarget.style.color = t.textMuted; }}
-            >
-              <span style={{ fontSize: 13 }}>{s.icon}</span>
-              {s.title}
+    <div className="page-in">
+      <PageTitle sub="Complete documentation — what each feature does, how it works, and when to use it">Help & Documentation</PageTitle>
+      {secs.map(s => (
+        <div key={s.id} style={{ marginBottom:6 }}>
+          <div
+            onClick={() => tog(s.id)}
+            style={{
+              padding:"12px 16px", background:C.bgCard,
+              border:`1px solid ${open === s.id ? C.accent + "40" : C.border}`,
+              borderLeft:`2px solid ${open === s.id ? C.accent : "transparent"}`,
+              borderRadius:open === s.id ? "6px 6px 0 0" : 6,
+              cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center",
+              transition:"all .2s", backdropFilter:"blur(8px)",
+              boxShadow: open === s.id ? `0 0 20px ${C.accent}12` : "none",
+            }}
+            onMouseEnter={e => { if (open !== s.id) e.currentTarget.style.borderLeftColor = `${C.accent}60`; }}
+            onMouseLeave={e => { if (open !== s.id) e.currentTarget.style.borderLeftColor = "transparent"; }}
+          >
+            <span style={{ fontFamily:font, fontSize:12, color:open === s.id ? C.accent : C.text, fontWeight:600 }}>{s.title}</span>
+            <span style={{ color:C.accent, fontSize:14, transition:"transform .25s cubic-bezier(.22,1,.36,1)", transform:open === s.id ? "rotate(180deg)" : "rotate(0)", display:"inline-block" }}>▾</span>
+          </div>
+          {open === s.id && (
+            <div className="anim-up" style={{
+              padding:"16px 20px", background:C.bgCard,
+              border:`1px solid ${C.accent}30`, borderTop:"none",
+              borderRadius:"0 0 6px 6px", borderLeft:`2px solid ${C.accent}`,
+              backdropFilter:"blur(8px)",
+            }}>
+              {s.c()}
             </div>
-          ))}
-        </Card>
-        <div>
-          {sec && (
-            <Card title={`${sec.icon} ${sec.title}`}>
-              <div style={{ fontFamily: "system-ui, sans-serif" }}>
-                {renderMd(sec.text)}
-              </div>
-            </Card>
           )}
         </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-// ═══════ MAIN ═══════
-
+// ═══════════════════════════════════════════
+// NAVIGATION CONFIG
+// ═══════════════════════════════════════════
 const NAV = [
-  { id: "dashboard", label: "SYSTEM", icon: "◉", desc: "Overview" },
-  { id: "interfaces", label: "INTERFACES", icon: "⚡", desc: "Adapters" },
-  { id: "wifi", label: "WIFI SCAN", icon: "📡", desc: "Scanner" },
-  { id: "handshake", label: "HANDSHAKE", icon: "🔓", desc: "Capture" },
-  { id: "recon", label: "RECON", icon: "🔍", desc: "Network" },
-  { id: "attacks", label: "ATTACKS", icon: "⚔", desc: "Vectors" },
-  { id: "sessions", label: "SESSIONS", icon: "📋", desc: "Audit" },
-  { id: "processes", label: "PROCESSES", icon: "▣", desc: "Monitor" },
-  { id: "help", label: "HELP", icon: "?", desc: "Docs" },
+  { id:"dashboard", label:"SYSTEM", icon:"◉", color:"#00ff95" },
+  { id:"interfaces", label:"INTERFACES", icon:"⚡", color:"#3ab5ff" },
+  { id:"wifi", label:"WIFI SCAN", icon:"◈", color:"#00ff95" },
+  { id:"handshake", label:"HANDSHAKE", icon:"◎", color:"#ff9500" },
+  { id:"advanced", label:"ADVANCED", icon:"⬡", color:"#c084fc" },
+  { id:"recon", label:"RECON", icon:"◐", color:"#3ab5ff" },
+  { id:"attacks", label:"ATTACKS", icon:"◆", color:"#ff2055" },
+  { id:"captures", label:"CAPTURES", icon:"▤", color:"#ff9500" },
+  { id:"sessions", label:"SESSIONS", icon:"◧", color:"#00ff95" },
+  { id:"processes", label:"PROCESSES", icon:"▣", color:"#3ab5ff" },
+  { id:"help", label:"HELP", icon:"?", color:"#ff9500" },
 ];
-const PAGES = { dashboard: DashboardPage, interfaces: InterfacesPage, wifi: WifiScanPage, handshake: HandshakePage, recon: ReconPage, attacks: AttacksPage, sessions: SessionsPage, processes: ProcessesPage, help: HelpPage };
+const PAGES = { dashboard:DashboardPage, interfaces:InterfacesPage, wifi:WifiScanPage, handshake:HandshakePage, advanced:AdvancedPage, recon:ReconPage, attacks:AttacksPage, captures:CapturesPage, sessions:SessionsPage, processes:ProcessesPage, help:HelpPage };
 
+// ═══════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════
 export default function App() {
   const [page, setPage] = useState("dashboard");
-  const [themeName, setThemeName] = useState("dark");
   const [time, setTime] = useState(new Date());
-  const [collapsed, setCollapsed] = useState(false);
+  const [col, setCol] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    const saved = typeof window !== 'undefined' && window.localStorage?.getItem('wfaudit-theme');
+    if (saved !== null) return saved === 'dark';
+    if (typeof window !== 'undefined' && window.matchMedia) return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return true;
+  });
+  useEffect(() => { try { window.localStorage?.setItem('wfaudit-theme', isDark ? 'dark' : 'light'); } catch(e){} }, [isDark]);
+  const [pageKey, setPageKey] = useState(0);
+  const C = isDark ? DARK : LIGHT;
+
   useEffect(() => { const i = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(i); }, []);
-  const t = THEMES[themeName]; const Page = PAGES[page];
-  const navIdx = NAV.findIndex(n => n.id === page);
+
+  const navigate = (id) => {
+    setPage(id);
+    setPageKey(k => k + 1);
+  };
+
+  const Page = PAGES[page];
 
   return (
-    <ThemeCtx.Provider value={t}>
-      <div style={{ display: "flex", height: "100vh", background: t.bg, color: t.text, fontFamily: "'Space Mono', monospace", overflow: "hidden", position: "relative" }}>
-        <GlobalStyles t={t} />
-        <GridBg t={t} />
+    <ThemeCtx.Provider value={C}>
+      <div style={{
+        display:"flex", height:"100vh",
+        background:C.bg, color:C.text,
+        fontFamily:font, overflow:"hidden",
+        transition:"background .3s ease, color .3s ease",
+      }}>
+        <style>{makeCSS(C)}</style>
 
-        {/* ═══ SIDEBAR ═══ */}
+        {/* ── BACKGROUND EFFECTS ── */}
         <div style={{
-          width: collapsed ? 56 : 200, background: t.bgSidebar,
-          borderRight: `1px solid ${t.borderAccent}`, display: "flex", flexDirection: "column",
-          transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)", flexShrink: 0,
-          position: "relative", zIndex: 10, overflow: "hidden",
+          position:"fixed", inset:0, pointerEvents:"none", zIndex:0,
+          backgroundImage:`radial-gradient(${C.accent}07 1px, transparent 1px)`,
+          backgroundSize:"28px 28px",
+        }} />
+        {C.isDark && (
+          <>
+            <div style={{
+              position:"fixed", top:"-20%", left:"-10%", width:"50vw", height:"50vh",
+              background:`radial-gradient(ellipse, ${C.accent}06 0%, transparent 70%)`,
+              pointerEvents:"none", zIndex:0,
+            }} />
+            <div style={{
+              position:"fixed", bottom:"-20%", right:"-10%", width:"50vw", height:"50vh",
+              background:`radial-gradient(ellipse, ${C.purple}05 0%, transparent 70%)`,
+              pointerEvents:"none", zIndex:0,
+            }} />
+          </>
+        )}
+
+        {/* ── SIDEBAR ── */}
+        <div style={{
+          width:col ? 52 : 172, background:C.bgSidebar,
+          borderRight:`1px solid ${C.border}`,
+          display:"flex", flexDirection:"column",
+          transition:"width .25s cubic-bezier(.22,1,.36,1)", flexShrink:0,
+          position:"relative", zIndex:20,
+          boxShadow:`4px 0 24px ${C.isDark ? "rgba(0,0,0,.5)" : "rgba(0,0,0,.1)"}`,
         }}>
+          {/* Sidebar grid bg */}
+          <div style={{
+            position:"absolute", inset:0,
+            backgroundImage:`radial-gradient(${C.accent}08 1px, transparent 1px)`,
+            backgroundSize:"18px 18px", pointerEvents:"none",
+          }} />
+          {/* Top edge glow */}
+          <div style={{
+            position:"absolute", top:0, left:0, right:0, height:1,
+            background:`linear-gradient(90deg, transparent, ${C.accent}40, transparent)`,
+            pointerEvents:"none",
+          }} />
+
           {/* Logo */}
-          <div onClick={() => setCollapsed(!collapsed)} style={{
-            padding: collapsed ? "20px 0" : "20px 16px", cursor: "pointer",
-            borderBottom: `1px solid ${t.borderAccent}`, textAlign: collapsed ? "center" : "left",
-          }}>
-            {collapsed ? (
-              <div style={{ fontSize: 18, color: t.accent, fontFamily: "'Orbitron', sans-serif", fontWeight: 900, textShadow: `0 0 20px ${t.accentGlow}`, textAlign: "center" }}>W</div>
-            ) : (
-              <>
-                <div style={{ fontSize: 14, color: t.accent, fontFamily: "'Orbitron', sans-serif", fontWeight: 900, letterSpacing: "0.15em", textShadow: `0 0 20px ${t.accentGlow}` }}>WFAUDIT</div>
-                <div style={{ fontSize: 8, color: t.sideClockDim, letterSpacing: "0.3em", marginTop: 3, fontFamily: "'Space Mono', monospace" }}>NEURAL v1.0</div>
-              </>
+          <div
+            onClick={() => setCol(!col)}
+            style={{
+              padding:"16px 12px", borderBottom:`1px solid ${C.border}`,
+              cursor:"pointer", position:"relative", zIndex:1,
+              display:"flex", flexDirection:"column", alignItems:col ? "center" : "flex-start",
+            }}
+          >
+            <div style={{
+              fontFamily:fontDisplay, fontSize:col ? 13 : 15, color:C.accent,
+              fontWeight:900, letterSpacing:col ? ".05em" : ".12em",
+              textShadow:`0 0 24px ${C.accent}60, 0 0 48px ${C.accent}20`,
+              transition:"all .25s",
+            }}>
+              {col ? "W" : "WFAUDIT"}
+            </div>
+            {!col && (
+              <div style={{
+                fontSize:8, color:C.textMuted, letterSpacing:".22em",
+                marginTop:2, textTransform:"uppercase",
+              }}>v2.0.0 · TACTICAL</div>
             )}
           </div>
 
           {/* Nav */}
-          <nav style={{ flex: 1, padding: "10px 0", overflowY: "auto" }}>
-            {NAV.map((item, i) => (
-              <div
-                key={item.id} onClick={() => setPage(item.id)}
-                className="nav-item"
-                style={{
-                  padding: collapsed ? "12px 0" : "10px 16px",
-                  cursor: "pointer", justifyContent: collapsed ? "center" : "flex-start",
-                  background: page === item.id ? t.sideActive : "transparent",
-                  borderLeft: page === item.id ? `2px solid ${t.sideActiveBorder}` : "2px solid transparent",
-                  color: page === item.id ? t.accent : t.sideTextDim,
-                  display: "flex", alignItems: "center", gap: 10,
-                  transition: "all 0.18s ease",
-                  position: "relative",
-                }}
-              >
-                {page === item.id && (
-                  <div style={{
-                    position: "absolute", inset: 0, background: `linear-gradient(90deg, ${t.accent}10, transparent)`,
-                    pointerEvents: "none",
-                  }} />
-                )}
-                <span style={{ fontSize: 14, flexShrink: 0 }}>{item.icon}</span>
-                {!collapsed && (
-                  <div>
-                    <div style={{ fontSize: 9, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, letterSpacing: "0.12em", color: page === item.id ? t.accent : t.sideTextDim }}>{item.label}</div>
-                  </div>
-                )}
-              </div>
-            ))}
+          <nav style={{ flex:1, padding:"8px 0", position:"relative", zIndex:1, display:"flex", flexDirection:"column", overflowY:"auto" }}>
+            {NAV.map((item) => {
+              const a = page === item.id;
+              const isHelp = item.id === "help";
+              return (
+                <div key={item.id} className="nav-item"
+                  onClick={() => navigate(item.id)}
+                  style={{
+                    padding:col ? "10px 0" : "8px 14px",
+                    cursor:"pointer",
+                    background:a ? `${item.color}10` : "transparent",
+                    borderLeft:a ? `2px solid ${item.color}` : "2px solid transparent",
+                    color:a ? item.color : C.textMuted,
+                    fontSize:9, letterSpacing:".12em",
+                    display:"flex", alignItems:"center", gap:8,
+                    textAlign:col ? "center" : "left",
+                    justifyContent:col ? "center" : "flex-start",
+                    marginTop:isHelp ? "auto" : 0,
+                    borderTop:isHelp ? `1px solid ${C.border}` : "none",
+                    fontFamily:fontDisplay, fontWeight:600,
+                    boxShadow:a ? `inset 0 0 20px ${item.color}08` : "none",
+                    transition:"all .18s cubic-bezier(.22,1,.36,1)",
+                    position:"relative",
+                  }}
+                  onMouseEnter={e => { if (!a) { e.currentTarget.style.color = item.color; e.currentTarget.style.borderLeftColor = `${item.color}40`; } }}
+                  onMouseLeave={e => { if (!a) { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderLeftColor = "transparent"; } }}
+                >
+                  <span className="nav-icon" style={{
+                    fontSize:14, width:20, textAlign:"center", display:"block",
+                    color:"inherit", filter:a ? `drop-shadow(0 0 6px ${item.color})` : "none",
+                    transition:"transform .18s, filter .18s",
+                  }}>{item.icon}</span>
+                  {!col && <span className="nav-label" style={{ fontSize:9, transition:"letter-spacing .18s" }}>{item.label}</span>}
+                  {/* Active indicator dot */}
+                  {a && (
+                    <div style={{
+                      position:"absolute", right:col ? -1 : 8, top:"50%", transform:"translateY(-50%)",
+                      width:4, height:4, borderRadius:"50%", background:item.color,
+                      boxShadow:`0 0 8px ${item.color}`,
+                    }} />
+                  )}
+                </div>
+              );
+            })}
           </nav>
 
-          {/* Footer */}
-          {!collapsed && (
-            <div style={{ padding: "12px 16px", borderTop: `1px solid ${t.borderAccent}` }}>
-              <div
-                onClick={() => setThemeName(themeName === "dark" ? "light" : "dark")}
-                style={{
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-                  padding: "7px 10px", borderRadius: 6, marginBottom: 12,
-                  background: "rgba(255,255,255,0.04)", border: `1px solid rgba(255,255,255,0.08)`,
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
-              >
-                <span style={{ fontSize: 14 }}>{themeName === "dark" ? "☀" : "☾"}</span>
-                <span style={{ fontSize: 9, color: t.sideTextDim, letterSpacing: "0.1em", fontFamily: "'Orbitron', sans-serif" }}>{themeName === "dark" ? "LIGHT" : "DARK"}</span>
-              </div>
-              <div style={{ fontSize: 9, color: t.sideClockDim, marginBottom: 2, fontFamily: "'Space Mono', monospace" }}>{time.toLocaleDateString()}</div>
-              <div style={{ fontSize: 13, color: t.sideClock, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, textShadow: t.name === "dark" ? `0 0 10px ${t.accentGlow}` : "none" }}>{time.toLocaleTimeString()}</div>
+          {/* Clock */}
+          {!col && (
+            <div style={{
+              padding:"10px 14px", borderTop:`1px solid ${C.border}`,
+              fontSize:9, color:C.textMuted, position:"relative", zIndex:1,
+              fontFamily:font,
+            }}>
+              <div style={{ letterSpacing:".08em" }}>{time.toLocaleDateString()}</div>
+              <div style={{
+                fontSize:15, color:C.accent, fontWeight:700, fontFamily:fontDisplay,
+                textShadow:`0 0 12px ${C.accent}50`, letterSpacing:".06em",
+              }}>{time.toLocaleTimeString()}</div>
             </div>
           )}
         </div>
 
-        {/* ═══ MAIN ═══ */}
-        <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
+        {/* ── MAIN CONTENT ── */}
+        <div style={{ flex:1, overflow:"auto", position:"relative", zIndex:10 }}>
           {/* Topbar */}
           <div style={{
-            padding: "0 24px", height: 52, borderBottom: `1px solid ${t.border}`,
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            background: t.bgTopbar, position: "sticky", top: 0, zIndex: 10,
-            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+            padding:"0 20px", height:44,
+            borderBottom:`1px solid ${C.border}`,
+            display:"flex", justifyContent:"space-between", alignItems:"center",
+            background:C.bgTopbar, position:"sticky", top:0, zIndex:30,
+            backdropFilter:"blur(16px)",
+            boxShadow:`0 1px 0 ${C.border}`,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: t.textDim }}>
-                <span style={{ color: t.accent }}>root@wfaudit</span>
-                <span style={{ color: t.textDim }}>:</span>
-                <span style={{ color: t.green }}>~/{page}</span>
-                <span style={{ color: t.accent, animation: "pulse 1s step-end infinite" }}>█</span>
-              </div>
-              {t.name === "dark" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 4, background: "rgba(0,255,163,0.06)", border: "1px solid rgba(0,255,163,0.15)" }}>
-                  <StatusDot color="green" />
-                  <span style={{ fontSize: 9, color: t.green, fontFamily: "'Orbitron', sans-serif", fontWeight: 700, letterSpacing: "0.1em" }}>LIVE</span>
-                </div>
-              )}
+            {/* Terminal path */}
+            <div style={{ fontFamily:font, fontSize:11, display:"flex", alignItems:"center", gap:2 }}>
+              <span style={{ color:C.accent, textShadow:`0 0 10px ${C.accent}50` }}>root@wfaudit</span>
+              <span style={{ color:C.textMuted }}>:</span>
+              <span style={{ color:C.accentDim }}>~/{page}</span>
+              <span style={{ color:C.accent, animation:"blink 1.2s step-end infinite", marginLeft:2 }}>█</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <div style={{ fontSize: 9, color: t.textDim, fontFamily: "'Orbitron', sans-serif", letterSpacing: "0.1em" }}>AUTHORIZED TESTING ONLY</div>
-              {collapsed && (
-                <div onClick={() => setThemeName(themeName === "dark" ? "light" : "dark")} style={{ cursor: "pointer", fontSize: 16 }}>
-                  {themeName === "dark" ? "☀" : "☾"}
-                </div>
-              )}
-              <div style={{
-                display: "flex", gap: 1,
-              }}>
-                {NAV.map((_, i) => (
-                  <div key={i} onClick={() => setPage(NAV[i].id)} style={{
-                    width: 4, height: 4, borderRadius: "50%",
-                    background: i === navIdx ? t.accent : t.textDim,
-                    cursor: "pointer", transition: "all 0.2s",
-                    boxShadow: i === navIdx ? `0 0 6px ${t.accent}` : "none",
-                    margin: "0 1px",
-                  }} />
-                ))}
+
+            <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+              <span style={{ fontSize:9, color:C.textMuted, fontFamily:font, letterSpacing:".12em" }}>
+                AUTHORIZED TESTING ONLY
+              </span>
+
+              {/* Theme toggle */}
+              <button
+                onClick={() => setIsDark(!isDark)}
+                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                style={{
+                  width:44, height:24, borderRadius:12, cursor:"pointer",
+                  background: isDark ? `linear-gradient(135deg, ${C.accent}30, ${C.purple}25)` : `linear-gradient(135deg, ${C.accent}20, ${C.info}15)`,
+                  border:`1px solid ${C.accent}40`, padding:0, position:"relative",
+                  transition:"all .3s cubic-bezier(.22,1,.36,1)",
+                  boxShadow: isDark ? `0 0 14px ${C.accent}20, inset 0 1px 2px rgba(0,0,0,.3)` : `0 2px 8px rgba(0,0,0,.1)`,
+                  outline:"none",
+                }}
+              >
+                <div style={{
+                  position:"absolute", top:3,
+                  left: isDark ? 22 : 3,
+                  width:16, height:16, borderRadius:"50%",
+                  background: isDark ? C.accent : C.warn,
+                  transition:"all .3s cubic-bezier(.22,1,.36,1)",
+                  boxShadow: isDark ? `0 0 10px ${C.accent}80` : `0 0 10px ${C.warn}60`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:9, color: isDark ? C.bg : "#fff",
+                }}>{isDark ? "☽" : "☀"}</div>
+              </button>
+
+              {/* Status dot */}
+              <div style={{ position:"relative", width:10, height:10 }}>
+                <div style={{
+                  position:"absolute", inset:0, borderRadius:"50%",
+                  background:C.accent, opacity:.3,
+                  animation:"pulseRing 2s ease-out infinite",
+                }} />
+                <div style={{
+                  position:"absolute", inset:2, borderRadius:"50%",
+                  background:C.accent,
+                  boxShadow:`0 0 8px ${C.accent}`,
+                }} />
               </div>
             </div>
           </div>
 
-          {/* Content */}
-          <div style={{ padding: "28px 28px", flex: 1 }}>
+          {/* Page content */}
+          <div style={{ padding:"24px 24px" }} key={pageKey}>
             <Page />
           </div>
         </div>

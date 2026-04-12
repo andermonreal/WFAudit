@@ -10,7 +10,6 @@ class InterfaceMode(str, Enum):
     MANAGED = "managed"
     MONITOR = "monitor"
 
-
 class ScanStatus(str, Enum):
     IDLE = "idle"
     RUNNING = "running"
@@ -18,77 +17,28 @@ class ScanStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
-class AttackType(str, Enum):
-    DEAUTH = "deauth"
-    EVIL_TWIN = "evil_twin"
-    WPA_CRACK = "wpa_crack"
-    MITM = "mitm"
-
-
 class SecurityType(str, Enum):
     OPEN = "open"
     WEP = "wep"
     WPA = "wpa"
     WPA2 = "wpa2"
     WPA3 = "wpa3"
+    WPA2_ENTERPRISE = "wpa2_enterprise"
+    WPA3_ENTERPRISE = "wpa3_enterprise"
     UNKNOWN = "unknown"
 
+class WifiBand(str, Enum):
+    BAND_2GHZ = "bg"
+    BAND_5GHZ = "a"
+    BAND_DUAL = "abg"
 
-# ── Network Interfaces ──
-
-class NetworkInterface(BaseModel):
-    name: str
-    mac: str
-    driver: Optional[str] = None
-    chipset: Optional[str] = None
-    mode: InterfaceMode = InterfaceMode.MANAGED
-    is_up: bool = False
-    supports_monitor: bool = False
-
-
-class SetModeRequest(BaseModel):
-    interface: str
-    mode: InterfaceMode
-    kill_conflicting: bool = True
-
-
-# ── WiFi Scanning (airodump) ──
-
-class AccessPoint(BaseModel):
-    bssid: str
-    essid: str
-    channel: int
-    power: int = 0
-    security: SecurityType = SecurityType.UNKNOWN
-    cipher: Optional[str] = None
-    auth: Optional[str] = None
-    beacons: int = 0
-    data_packets: int = 0
-    clients: list[str] = []
-    first_seen: Optional[datetime] = None
-    last_seen: Optional[datetime] = None
-    wps: bool = False
-
-
-class WifiScanRequest(BaseModel):
-    interface: str
-    channel: Optional[int] = None
-    duration: int = 30
-    target_bssid: Optional[str] = None
-
-
-class WifiScanResult(BaseModel):
-    id: str
-    status: ScanStatus
-    interface: str
-    started_at: datetime
-    finished_at: Optional[datetime] = None
-    access_points: list[AccessPoint] = []
-    client_count: int = 0
-
-
-# ── Nmap Recon ──
+class AuthType(str, Enum):
+    PSK = "psk"
+    EAP = "eap"
+    SAE = "sae"
+    OWE = "owe"
+    OPEN = "open"
+    UNKNOWN = "unknown"
 
 class NmapScanType(str, Enum):
     QUICK = "quick"
@@ -101,13 +51,118 @@ class NmapScanType(str, Enum):
     CUSTOM = "custom"
 
 
+# ── Network Interfaces ──
+
+class NetworkInterface(BaseModel):
+    name: str
+    mac: str
+    driver: Optional[str] = None
+    chipset: Optional[str] = None
+    mode: InterfaceMode = InterfaceMode.MANAGED
+    is_up: bool = False
+    supports_monitor: bool = False
+    supports_5ghz: bool = False
+    phy: Optional[str] = None
+    tx_power: Optional[int] = None
+
+
+class MacChangeRequest(BaseModel):
+    interface: str
+    new_mac: Optional[str] = None
+    vendor_prefix: Optional[str] = None
+
+
+# ── Wireless Client ──
+
+class WirelessClient(BaseModel):
+    mac: str
+    bssid: Optional[str] = None
+    power: int = 0
+    rate: Optional[str] = None
+    lost: int = 0
+    frames: int = 0
+    probes: list[str] = []
+    manufacturer: Optional[str] = None
+    first_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+
+
+# ── Access Point ──
+
+class AccessPoint(BaseModel):
+    bssid: str
+    essid: str
+    channel: int
+    power: int = 0
+    security: SecurityType = SecurityType.UNKNOWN
+    cipher: Optional[str] = None
+    auth: Optional[str] = None
+    beacons: int = 0
+    data_packets: int = 0
+    max_speed: Optional[int] = None
+    clients: list[str] = []
+    first_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
+    wps: bool = False
+    pmkid_available: bool = False
+    manufacturer: Optional[str] = None
+    band: Optional[str] = None
+    is_hidden: bool = False
+
+
+# ── WiFi Scanning ──
+
+class WifiScanRequest(BaseModel):
+    interface: str
+    channel: Optional[int] = None
+    duration: int = 30
+    target_bssid: Optional[str] = None
+    target_essid: Optional[str] = None
+    band: WifiBand = WifiBand.BAND_2GHZ
+
+
+class WifiScanResult(BaseModel):
+    id: str
+    status: ScanStatus
+    interface: str
+    band: str = "bg"
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    access_points: list[AccessPoint] = []
+    clients: list[WirelessClient] = []
+    client_count: int = 0
+    capture_files: list[str] = []
+
+
+# ── PNL Analysis ──
+
+class PnlAnalysis(BaseModel):
+    client_mac: str
+    manufacturer: Optional[str] = None
+    probed_networks: list[str] = []
+    is_associated: bool = False
+    associated_bssid: Optional[str] = None
+    associated_essid: Optional[str] = None
+    vulnerability_notes: list[str] = []
+
+class PnlReport(BaseModel):
+    scan_id: str
+    total_clients: int = 0
+    associated_clients: int = 0
+    unassociated_clients: int = 0
+    unique_probed_networks: list[str] = []
+    clients: list[PnlAnalysis] = []
+    evil_twin_candidates: list[str] = []
+
+
+# ── Nmap ──
+
 class NmapTarget(BaseModel):
-    target: str = Field(..., description="IP, CIDR, or range (e.g. 192.168.0.0/24)")
+    target: str
     scan_type: NmapScanType = NmapScanType.QUICK
     ports: Optional[str] = None
     custom_args: Optional[str] = None
     timeout: int = 300
-
 
 class DiscoveredHost(BaseModel):
     ip: str
@@ -118,7 +173,6 @@ class DiscoveredHost(BaseModel):
     ports: list[dict] = []
     services: list[dict] = []
     scripts_output: Optional[dict] = None
-
 
 class NmapScanResult(BaseModel):
     id: str
@@ -132,24 +186,32 @@ class NmapScanResult(BaseModel):
     command: Optional[str] = None
 
 
-# ── Attacks ──
+# ── Deauth ──
 
 class DeauthRequest(BaseModel):
     interface: str
     target_bssid: str
-    client_mac: Optional[str] = None  # None = broadcast
+    client_mac: Optional[str] = None
     packets: int = 50
+    use_essid: Optional[str] = None  # Can target by ESSID instead of BSSID
     reason: str = "Force handshake capture for WPA audit"
 
+
+# ── Handshake Capture ──
 
 class HandshakeCaptureRequest(BaseModel):
     interface: str
     target_bssid: str
+    target_essid: Optional[str] = None
     channel: int
     timeout: int = 120
     deauth_first: bool = True
     deauth_packets: int = 10
+    deauth_client: Optional[str] = None
+    band: WifiBand = WifiBand.BAND_2GHZ
 
+
+# ── WPA Crack ──
 
 class WpaCrackRequest(BaseModel):
     capture_file: str
@@ -158,6 +220,36 @@ class WpaCrackRequest(BaseModel):
     custom_wordlist_path: Optional[str] = None
 
 
+# ── PMKID Attack (Clientless) ──
+
+class PmkidCaptureRequest(BaseModel):
+    interface: str
+    target_bssid: str
+    target_essid: Optional[str] = None
+    channel: int
+    timeout: int = 60
+
+class PmkidCrackRequest(BaseModel):
+    pmkid_file: str
+    target_bssid: str
+    target_essid: str
+    wordlist: str = "rockyou.txt"
+
+
+# ── AP-Less Attack ──
+
+class ApLessAttackRequest(BaseModel):
+    monitor_interface: str
+    ap_interface: str
+    target_essid: str
+    channel: int = 6
+    wpa_version: int = 2
+    fake_passphrase: str = "fakepassword123"
+    capture_timeout: int = 300
+
+
+# ── Evil Twin (enhanced) ──
+
 class EvilTwinRequest(BaseModel):
     interface: str
     target_essid: str
@@ -165,7 +257,35 @@ class EvilTwinRequest(BaseModel):
     channel: int = 6
     internet_interface: Optional[str] = None
     captive_portal: bool = False
+    deauth_legitimate: bool = False
+    deauth_interface: Optional[str] = None
+    deauth_bssid: Optional[str] = None
+    deauth_packets: int = 50
 
+
+# ── Enterprise Attack ──
+
+class EnterpriseAttackRequest(BaseModel):
+    monitor_interface: str
+    ap_interface: str
+    target_essid: str
+    channel: int = 6
+    eap_type: str = "PEAP"
+    capture_creds: bool = True
+
+
+# ── WPA3 Attack ──
+
+class Wpa3AttackRequest(BaseModel):
+    interface: str
+    target_bssid: str
+    target_essid: Optional[str] = None
+    channel: int
+    attack_type: str = "downgrade"  # downgrade, transition_mode, dos
+    timeout: int = 120
+
+
+# ── MITM ──
 
 class MitmRequest(BaseModel):
     interface: str
@@ -177,7 +297,7 @@ class MitmRequest(BaseModel):
     filter_hosts: list[str] = []
 
 
-# ── CTF / Router Access ──
+# ── Router Probe ──
 
 class RouterProbeRequest(BaseModel):
     target_ip: str = "192.168.0.1"
@@ -187,22 +307,29 @@ class RouterProbeRequest(BaseModel):
     credential_list: Optional[str] = None
 
 
-class RouterProbeResult(BaseModel):
-    target_ip: str
-    is_accessible: bool = False
-    http_open: bool = False
-    https_open: bool = False
-    ssh_open: bool = False
-    telnet_open: bool = False
-    server_header: Optional[str] = None
-    router_model: Optional[str] = None
-    firmware_version: Optional[str] = None
-    default_creds_worked: bool = False
-    successful_credentials: Optional[dict] = None
-    vulnerabilities: list[str] = []
+# ── Capture Management ──
+
+class CaptureFile(BaseModel):
+    filename: str
+    filepath: str
+    file_type: str
+    size_bytes: int
+    created_at: Optional[datetime] = None
+    target_essid: Optional[str] = None
+    has_handshake: bool = False
+    has_pmkid: bool = False
 
 
-# ── Sessions & Reports ──
+# ── OUI Lookup ──
+
+class OuiLookupResult(BaseModel):
+    mac: str
+    oui: str
+    manufacturer: Optional[str] = None
+    is_randomized: bool = False
+
+
+# ── Sessions ──
 
 class AuditSession(BaseModel):
     id: str
@@ -215,18 +342,16 @@ class AuditSession(BaseModel):
     interface_used: Optional[str] = None
     findings: list[dict] = []
 
-
 class CreateSessionRequest(BaseModel):
     name: str
     company: str
     auditor: str
     notes: Optional[str] = None
 
-
 class Finding(BaseModel):
     session_id: str
     category: str
-    severity: str  # critical, high, medium, low, info
+    severity: str
     title: str
     description: str
     evidence: Optional[str] = None
