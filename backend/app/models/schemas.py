@@ -292,6 +292,7 @@ class MitmRequest(BaseModel):
     target_ips: list[str] = []
     gateway: str
     proxy_port: int = 8080
+    stealth: bool = True  # True=no HTTPS interception (invisible), False=full interception (needs CA cert)
     ssl_strip: bool = False
     capture_credentials: bool = True
     filter_hosts: list[str] = []

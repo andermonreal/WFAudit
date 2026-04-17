@@ -1,0 +1,549 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# WFAudit — WiFi Security Auditing Platform Management Script
+# ═══════════════════════════════════════════════════════════════
+#
+# Usage:
+#   ./wfaudit install    — Install all dependencies (system + Python + Node)
+#   ./wfaudit start      — Start backend + frontend
+#   ./wfaudit stop       — Stop backend + frontend
+#   ./wfaudit status     — Check running status
+#   ./wfaudit logs       — Tail backend + frontend logs
+#   ./wfaudit clean      — Remove .venv, node_modules, logs
+#   ./wfaudit help       — Show this help
+#
+# Structure expected:
+#   /repo-root/
+#     ├── wfaudit          (this script)
+#     ├── backend/         (FastAPI app)
+#     │   ├── app/
+#     │   └── requirements.txt
+#     └── frontend/        (React/Vite app)
+#         ├── src/
+#         └── package.json
+#
+# The script must be run from the repository root.
+# Backend requires root privileges for WiFi operations.
+# ═══════════════════════════════════════════════════════════════
+
+set -e
+
+# ══════════ CONFIG ══════════
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="${SCRIPT_DIR}/backend"
+FRONTEND_DIR="${SCRIPT_DIR}/frontend"
+VENV_DIR="${SCRIPT_DIR}/.venv"
+LOG_DIR="${SCRIPT_DIR}/logs"
+PID_DIR="${SCRIPT_DIR}/.pids"
+
+BACKEND_HOST="${WFAUDIT_HOST:-0.0.0.0}"
+BACKEND_PORT="${WFAUDIT_PORT:-8000}"
+FRONTEND_PORT="${WFAUDIT_FRONTEND_PORT:-5173}"
+
+BACKEND_LOG="${LOG_DIR}/backend.log"
+FRONTEND_LOG="${LOG_DIR}/frontend.log"
+BACKEND_PID="${PID_DIR}/backend.pid"
+FRONTEND_PID="${PID_DIR}/frontend.pid"
+
+# ══════════ HELPERS ══════════
+info()  { echo "[INFO]    $*"; }
+ok()    { echo "[OK]      $*"; }
+warn()  { echo "[WARN]    $*"; }
+err()   { echo "[ERROR]   $*" >&2; }
+step()  { echo; echo "▶ $*"; }
+hr()    { echo "─────────────────────────────────────────────"; }
+
+banner() {
+    echo
+    echo "   ╦ ╦╔═╗╔═╗╦ ╦╔╦╗╦╔╦╗"
+    echo "   ║║║╠╣ ╠═╣║ ║ ║║║ ║ "
+    echo "   ╚╩╝╚  ╩ ╩╚═╝═╩╝╩ ╩ "
+    echo "   WiFi Security Audit Platform"
+    echo
+}
+
+require_root() {
+    if [ "$EUID" -ne 0 ]; then
+        err "This command requires root privileges"
+        err "Re-run with: sudo ./wfaudit $*"
+        exit 1
+    fi
+}
+
+ensure_dirs() {
+    mkdir -p "$LOG_DIR" "$PID_DIR"
+}
+
+check_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO="$ID"
+    else
+        DISTRO="unknown"
+    fi
+}
+
+# ══════════ INSTALL ══════════
+cmd_install() {
+    banner
+    require_root install
+    ensure_dirs
+    check_distro
+
+    step "System Dependencies"
+
+    info "Detected distribution: $DISTRO"
+
+    SYSTEM_PKGS=(
+        # Python
+        python3 python3-pip python3-venv python3-dev
+        # WiFi audit core
+        aircrack-ng hcxdumptool hcxtools hashcat
+        # Network
+        nmap tcpdump tshark
+        # Attacks
+        hostapd dnsmasq macchanger
+        dsniff arping
+        mitmproxy
+        # System utilities
+        iptables iproute2 net-tools
+        wireless-tools iw
+        # Build tools
+        build-essential libssl-dev libffi-dev
+        # SSL
+        openssl
+        # Optional but recommended
+        freeradius reaver bully crunch
+    )
+
+    case "$DISTRO" in
+        kali|debian|ubuntu|parrot)
+            info "Installing system packages with apt..."
+            apt-get update -qq
+            for pkg in "${SYSTEM_PKGS[@]}"; do
+                if dpkg -s "$pkg" >/dev/null 2>&1; then
+                    echo "  ✓ $pkg already installed"
+                else
+                    echo "  → Installing $pkg..."
+                    apt-get install -y -qq "$pkg" 2>/dev/null || warn "$pkg failed (may not be available)"
+                fi
+            done
+            ;;
+        arch|manjaro)
+            info "Installing system packages with pacman..."
+            pacman -Sy --noconfirm --needed "${SYSTEM_PKGS[@]}" 2>/dev/null || warn "Some packages may have failed"
+            ;;
+        fedora|rhel|centos)
+            info "Installing system packages with dnf..."
+            dnf install -y "${SYSTEM_PKGS[@]}" 2>/dev/null || warn "Some packages may have failed"
+            ;;
+        *)
+            warn "Unknown distribution: $DISTRO"
+            warn "Please install these packages manually:"
+            printf '  - %s\n' "${SYSTEM_PKGS[@]}"
+            ;;
+    esac
+
+    ok "System dependencies installed"
+
+    # ─── Backend — Python venv ───
+    step "Backend Python Environment"
+
+    if [ ! -d "$BACKEND_DIR" ]; then
+        err "Backend directory not found: $BACKEND_DIR"
+        exit 1
+    fi
+
+    if [ ! -d "$VENV_DIR" ]; then
+        info "Creating virtual environment at $VENV_DIR"
+        python3 -m venv "$VENV_DIR"
+    else
+        info "Virtual environment already exists"
+    fi
+
+    info "Upgrading pip..."
+    "$VENV_DIR/bin/pip" install --upgrade pip wheel setuptools >/dev/null
+
+    if [ -f "$BACKEND_DIR/requirements.txt" ]; then
+        info "Installing Python requirements..."
+        "$VENV_DIR/bin/pip" install -r "$BACKEND_DIR/requirements.txt"
+    else
+        warn "No requirements.txt found — installing core dependencies"
+        "$VENV_DIR/bin/pip" install \
+            fastapi uvicorn[standard] pydantic pydantic-settings \
+            python-multipart python-dotenv aiofiles \
+            httpx mitmproxy
+    fi
+
+    if [ -n "$SUDO_USER" ]; then
+        info "Setting ownership for $SUDO_USER on .venv..."
+        chown -R "$SUDO_USER":"$SUDO_USER" "$VENV_DIR"
+    fi
+
+    ok "Backend environment ready"
+
+    # ─── Frontend — Node + npm ───
+    step "Frontend Node Environment"
+
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        err "Frontend directory not found: $FRONTEND_DIR"
+        exit 1
+    fi
+
+    if ! command -v node >/dev/null 2>&1; then
+        info "Node.js not found — installing via NodeSource..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || true
+        apt-get install -y nodejs
+    else
+        NODE_VER=$(node --version)
+        info "Node.js found: $NODE_VER"
+    fi
+
+    if [ -f "$FRONTEND_DIR/package.json" ]; then
+        info "Installing npm packages..."
+        cd "$FRONTEND_DIR"
+        if [ -n "$SUDO_USER" ]; then
+            sudo -u "$SUDO_USER" npm install --silent 2>&1 | tail -5
+        else
+            npm install --silent 2>&1 | tail -5
+        fi
+        cd "$SCRIPT_DIR"
+    else
+        warn "No package.json found in frontend/"
+    fi
+
+    ok "Frontend environment ready"
+
+    # ─── mitmproxy CA generation ───
+    step "mitmproxy CA Certificate"
+
+    info "Generating mitmproxy CA (used for MITM full interception mode)..."
+    timeout 5 "$VENV_DIR/bin/mitmdump" --listen-port 18888 >/dev/null 2>&1 || true
+
+    TARGET_HOME="${HOME}"
+    if [ -n "$SUDO_USER" ]; then
+        TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    fi
+
+    if [ -f "${TARGET_HOME}/.mitmproxy/mitmproxy-ca-cert.pem" ]; then
+        ok "CA generated at ${TARGET_HOME}/.mitmproxy/"
+    else
+        warn "CA not generated — run 'mitmdump' once manually to create it"
+    fi
+
+    # ─── Final summary ───
+    hr
+    echo "✓ Installation complete!"
+    echo
+    echo "Start the platform with: sudo ./wfaudit start"
+    echo "Backend will run on:     http://${BACKEND_HOST}:${BACKEND_PORT}"
+    echo "Frontend will run on:    http://localhost:${FRONTEND_PORT}"
+    hr
+}
+
+# ══════════ START ══════════
+cmd_start() {
+    banner
+    require_root start
+    ensure_dirs
+
+    if is_running "$BACKEND_PID" || is_running "$FRONTEND_PID"; then
+        err "WFAudit is already running. Use './wfaudit stop' first."
+        cmd_status
+        exit 1
+    fi
+
+    if [ ! -f "$VENV_DIR/bin/uvicorn" ]; then
+        err "Virtual environment not found. Run './wfaudit install' first."
+        exit 1
+    fi
+
+    # ─── Start backend ───
+    step "Starting Backend (FastAPI)"
+
+    cd "$BACKEND_DIR"
+    nohup "$VENV_DIR/bin/uvicorn" app.main:app \
+        --host "$BACKEND_HOST" \
+        --port "$BACKEND_PORT" \
+        > "$BACKEND_LOG" 2>&1 &
+    BACKEND_PROC_PID=$!
+    echo "$BACKEND_PROC_PID" > "$BACKEND_PID"
+    cd "$SCRIPT_DIR"
+
+    info "Waiting for backend to be ready..."
+    for i in {1..15}; do
+        sleep 1
+        if curl -sf "http://localhost:${BACKEND_PORT}/system/health" >/dev/null 2>&1; then
+            ok "Backend is up (PID $BACKEND_PROC_PID)"
+            break
+        fi
+        if [ "$i" -eq 15 ]; then
+            err "Backend failed to start. Check logs: ${BACKEND_LOG}"
+            tail -20 "$BACKEND_LOG"
+            exit 1
+        fi
+        printf "."
+    done
+    echo
+
+    # ─── Start frontend ───
+    step "Starting Frontend (Vite)"
+
+    if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+        warn "Frontend not found — starting backend only"
+    else
+        cd "$FRONTEND_DIR"
+        if [ -n "$SUDO_USER" ]; then
+            nohup sudo -u "$SUDO_USER" npm run dev -- --host --port "$FRONTEND_PORT" \
+                > "$FRONTEND_LOG" 2>&1 &
+        else
+            nohup npm run dev -- --host --port "$FRONTEND_PORT" \
+                > "$FRONTEND_LOG" 2>&1 &
+        fi
+        FRONTEND_PROC_PID=$!
+        echo "$FRONTEND_PROC_PID" > "$FRONTEND_PID"
+        cd "$SCRIPT_DIR"
+
+        info "Waiting for frontend to be ready..."
+        for i in {1..20}; do
+            sleep 1
+            if curl -sf "http://localhost:${FRONTEND_PORT}" >/dev/null 2>&1; then
+                ok "Frontend is up (PID $FRONTEND_PROC_PID)"
+                break
+            fi
+            if [ "$i" -eq 20 ]; then
+                warn "Frontend may not be ready yet. Check logs: ${FRONTEND_LOG}"
+            fi
+            printf "."
+        done
+        echo
+    fi
+
+    hr
+    echo "✓ WFAudit is running"
+    echo
+    echo "Backend:   http://localhost:${BACKEND_PORT}        (API docs at /docs)"
+    [ -f "$FRONTEND_PID" ] && \
+    echo "Frontend:  http://localhost:${FRONTEND_PORT}        (web UI)"
+    echo
+    echo "View logs:   ./wfaudit logs"
+    echo "Stop:        sudo ./wfaudit stop"
+    hr
+}
+
+# ══════════ STOP ══════════
+cmd_stop() {
+    require_root stop
+    ensure_dirs
+
+    step "Stopping WFAudit"
+
+    stopped_any=false
+
+    if [ -f "$FRONTEND_PID" ]; then
+        PID=$(cat "$FRONTEND_PID")
+        if kill -0 "$PID" 2>/dev/null; then
+            info "Stopping frontend (PID $PID)..."
+            kill "$PID" 2>/dev/null || true
+            sleep 1
+            kill -9 "$PID" 2>/dev/null || true
+            pkill -f "vite.*${FRONTEND_PORT}" 2>/dev/null || true
+            ok "Frontend stopped"
+            stopped_any=true
+        fi
+        rm -f "$FRONTEND_PID"
+    fi
+
+    if [ -f "$BACKEND_PID" ]; then
+        PID=$(cat "$BACKEND_PID")
+        if kill -0 "$PID" 2>/dev/null; then
+            info "Stopping backend (PID $PID)..."
+            kill "$PID" 2>/dev/null || true
+            sleep 1
+            kill -9 "$PID" 2>/dev/null || true
+            pkill -f "uvicorn.*app.main" 2>/dev/null || true
+            ok "Backend stopped"
+            stopped_any=true
+        fi
+        rm -f "$BACKEND_PID"
+    fi
+
+    info "Cleaning up residual attack processes..."
+    pkill -f arpspoof 2>/dev/null || true
+    pkill -f mitmdump 2>/dev/null || true
+    pkill -f mitm_stealth_monitor 2>/dev/null || true
+    pkill -f "hostapd.*wfaudit" 2>/dev/null || true
+
+    iptables -t nat -F 2>/dev/null || true
+    iptables -F FORWARD 2>/dev/null || true
+    sysctl -w net.ipv4.ip_forward=0 >/dev/null 2>&1 || true
+
+    if [ "$stopped_any" = false ]; then
+        warn "WFAudit was not running"
+    else
+        ok "All services stopped"
+    fi
+}
+
+# ══════════ STATUS ══════════
+is_running() {
+    local pidfile="$1"
+    [ -f "$pidfile" ] || return 1
+    local pid=$(cat "$pidfile")
+    kill -0 "$pid" 2>/dev/null
+}
+
+cmd_status() {
+    banner
+    step "Service Status"
+
+    if is_running "$BACKEND_PID"; then
+        PID=$(cat "$BACKEND_PID")
+        echo "  Backend:   ● RUNNING   PID $PID   http://localhost:${BACKEND_PORT}"
+    else
+        echo "  Backend:   ○ STOPPED"
+    fi
+
+    if is_running "$FRONTEND_PID"; then
+        PID=$(cat "$FRONTEND_PID")
+        echo "  Frontend:  ● RUNNING   PID $PID   http://localhost:${FRONTEND_PORT}"
+    else
+        echo "  Frontend:  ○ STOPPED"
+    fi
+
+    echo
+
+    if is_running "$BACKEND_PID"; then
+        step "Backend Health"
+        if curl -sf "http://localhost:${BACKEND_PORT}/system/health" >/dev/null 2>&1; then
+            echo "  Health:  ✓ OK"
+        else
+            echo "  Health:  ✗ NOT RESPONDING"
+        fi
+
+        MITM_STATUS=$(curl -sf "http://localhost:${BACKEND_PORT}/attacks/mitm/status" 2>/dev/null || echo "")
+        if echo "$MITM_STATUS" | grep -q '"active":true'; then
+            echo "  MITM:      ● ACTIVE"
+        fi
+        ET_STATUS=$(curl -sf "http://localhost:${BACKEND_PORT}/attacks/evil-twin/status" 2>/dev/null || echo "")
+        if echo "$ET_STATUS" | grep -q '"active":true'; then
+            echo "  Evil Twin: ● ACTIVE"
+        fi
+    fi
+    hr
+}
+
+# ══════════ LOGS ══════════
+cmd_logs() {
+    step "Tailing logs (Ctrl+C to exit)"
+
+    if [ ! -f "$BACKEND_LOG" ] && [ ! -f "$FRONTEND_LOG" ]; then
+        err "No logs found. Is WFAudit running?"
+        exit 1
+    fi
+
+    if command -v multitail >/dev/null 2>&1; then
+        multitail "$BACKEND_LOG" "$FRONTEND_LOG"
+    else
+        tail -f "$BACKEND_LOG" "$FRONTEND_LOG" 2>/dev/null
+    fi
+}
+
+# ══════════ CLEAN ══════════
+cmd_clean() {
+    warn "This will remove .venv, node_modules, logs, and .pids"
+    read -p "Continue? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        info "Aborted"
+        exit 0
+    fi
+
+    if is_running "$BACKEND_PID" || is_running "$FRONTEND_PID"; then
+        info "Stopping services first..."
+        cmd_stop
+    fi
+
+    step "Cleaning"
+
+    [ -d "$VENV_DIR" ]                  && rm -rf "$VENV_DIR"                  && ok "Removed .venv"
+    [ -d "$FRONTEND_DIR/node_modules" ] && rm -rf "$FRONTEND_DIR/node_modules" && ok "Removed node_modules"
+    [ -d "$LOG_DIR" ]                   && rm -rf "$LOG_DIR"                   && ok "Removed logs"
+    [ -d "$PID_DIR" ]                   && rm -rf "$PID_DIR"                   && ok "Removed .pids"
+
+    ok "Clean complete"
+}
+
+# ══════════ HELP ══════════
+cmd_help() {
+    banner
+    cat <<'HELPEOF'
+USAGE
+    ./wfaudit <command>
+
+COMMANDS
+    install    Install all system packages, Python venv, and Node modules
+               Must run as root: sudo ./wfaudit install
+
+    start      Start backend (FastAPI) and frontend (Vite) services
+               Must run as root: sudo ./wfaudit start
+
+    stop       Stop all running services and clean up iptables/ARP
+
+    restart    Stop + start (equivalent to running both sequentially)
+
+    status     Show running status and active attacks
+
+    logs       Tail backend + frontend logs in real time
+
+    clean      Remove .venv, node_modules, logs (full reset)
+
+    help       Show this help message
+
+ENVIRONMENT VARIABLES
+    WFAUDIT_HOST           Backend bind host          (default: 0.0.0.0)
+    WFAUDIT_PORT           Backend port               (default: 8000)
+    WFAUDIT_FRONTEND_PORT  Frontend port              (default: 5173)
+
+FILES
+    .venv/                 Python virtual environment
+    logs/backend.log       Backend output
+    logs/frontend.log      Frontend output
+    .pids/backend.pid      Running backend PID
+    .pids/frontend.pid     Running frontend PID
+
+REQUIREMENTS
+    - Linux (Kali/Debian/Ubuntu/Arch/Fedora)
+    - Root privileges for install/start/stop
+    - WiFi adapter with monitor mode support
+    - ~500 MB disk space
+
+FIRST RUN
+    sudo ./wfaudit install       # One-time setup
+    sudo ./wfaudit start         # Start services
+    # Open browser at http://localhost:5173
+    sudo ./wfaudit stop          # When done
+
+LEGAL NOTICE
+    Use only on networks you own or have written authorization to audit.
+    Unauthorized use violates computer crime laws in most countries.
+
+HELPEOF
+}
+
+# ══════════ DISPATCH ══════════
+case "${1:-help}" in
+    install)        cmd_install "$@" ;;
+    start)          cmd_start ;;
+    stop)           cmd_stop ;;
+    restart)        cmd_stop; sleep 1; cmd_start ;;
+    status)         cmd_status ;;
+    logs)           cmd_logs ;;
+    clean)          cmd_clean ;;
+    help|--help|-h) cmd_help ;;
+    *)
+        err "Unknown command: $1"
+        cmd_help
+        exit 1
+        ;;
+esac
