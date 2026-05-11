@@ -357,3 +357,56 @@ class Finding(BaseModel):
     description: str
     evidence: Optional[str] = None
     recommendation: Optional[str] = None
+
+
+# ── Wordlist Generator ──
+
+class WordlistGenerateRequest(BaseModel):
+    seed_words: list[str]
+    output_filename: str = "custom_wordlist.txt"
+
+    # Case mutations
+    use_lowercase: bool = True
+    use_uppercase: bool = True
+    use_capitalize: bool = True
+    use_alternating_case: bool = False
+
+    # Letter mutations
+    use_leet: bool = True
+    leet_intensity: str = "medium"  # low, medium, high
+    use_doubling: bool = True
+    use_stretching: bool = False
+    use_reverse: bool = True
+    use_palindrome: bool = False
+
+    # NEW: Number infix
+    use_number_infix: bool = True
+
+    # Numeric appendages
+    use_numbers: bool = True
+    number_max_length: int = 4
+    use_years: bool = True
+    use_birth_years: bool = True
+
+    # Symbols
+    use_symbols: bool = True
+    use_double_symbols: bool = True
+    use_symbol_pairs: bool = True
+
+    # Word combinations
+    combine_words: bool = True
+    combine_3_words: bool = False
+    use_separators: bool = True
+    use_reverse_combine: bool = True
+
+    # Common base words
+    add_common_base: bool = True
+    add_spanish_base: bool = True
+    add_spanish_names: bool = True
+
+    # Length filter
+    min_length: int = 6
+    max_length: int = 32
+
+    # Limits
+    max_total: int = 10_000_000

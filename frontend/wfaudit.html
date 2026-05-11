@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WFAudit — Plataforma de Auditoría WiFi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--sw:228px;--r:8px;--rl:12px;--t:160ms cubic-bezier(.4,0,.2,1);}
+[data-theme="dark"]{
+  --bg0:#05090f;--bg1:#090e18;--bg2:#0d1420;--bg3:#111c2e;--bg4:#162234;
+  --b0:#1a2d48;--b1:#243d60;--b2:#2e4e78;
+  --t0:#ddeeff;--t1:#8aaac8;--t2:#4a6a88;--t3:#1a2d48;
+  --g:#00ff88;--g2:rgba(0,255,136,.14);--g3:rgba(0,255,136,.06);
+  --c:#00d4ff;--c2:rgba(0,212,255,.14);--c3:rgba(0,212,255,.05);
+  --r:#ff3b5c;--r2:rgba(255,59,92,.14);
+  --o:#ff8c42;--o2:rgba(255,140,66,.14);
+  --y:#ffd60a;--y2:rgba(255,214,10,.14);
+  --p:#a78bfa;--p2:rgba(167,139,250,.14);
+  --sh:0 4px 24px rgba(0,0,0,.6);
+  --gg:0 0 20px rgba(0,255,136,.25),0 0 40px rgba(0,255,136,.1);
+  --gc:0 0 20px rgba(0,212,255,.25),0 0 40px rgba(0,212,255,.1);
+  --sl:rgba(0,212,255,.022);
+  --ibg:#0d1420;--sc:#1a2d48;--sct:#2e4e78;
+  --monbg:rgba(0,255,136,.04);--monb:rgba(0,255,136,.4);
+  --mgdbg:rgba(0,212,255,.04);--mgdb:rgba(0,212,255,.3);
+}
+[data-theme="light"]{
+  --bg0:#eef2f9;--bg1:#f4f7fc;--bg2:#ffffff;--bg3:#f8faff;--bg4:#edf2fb;
+  --b0:#ccd8eb;--b1:#b3c6de;--b2:#8aaac8;
+  --t0:#1a2840;--t1:#3d5470;--t2:#7090b0;--t3:#ccd8eb;
+  --g:#00994f;--g2:rgba(0,153,79,.12);--g3:rgba(0,153,79,.06);
+  --c:#0077cc;--c2:rgba(0,119,204,.12);--c3:rgba(0,119,204,.05);
+  --r:#cc2244;--r2:rgba(204,34,68,.1);
+  --o:#cc5500;--o2:rgba(204,85,0,.1);
+  --y:#cc8800;--y2:rgba(204,136,0,.1);
+  --p:#7c3aed;--p2:rgba(124,58,237,.1);
+  --sh:0 4px 20px rgba(0,0,0,.1);
+  --gg:0 2px 12px rgba(0,153,79,.2);--gc:0 2px 12px rgba(0,119,204,.2);
+  --sl:transparent;
+  --ibg:#f8faff;--sc:#ccd8eb;--sct:#8aaac8;
+  --monbg:rgba(0,153,79,.06);--monb:rgba(0,153,79,.5);
+  --mgdbg:rgba(0,119,204,.04);--mgdb:rgba(0,119,204,.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:14px;}
+body{font-family:'Outfit',sans-serif;background:var(--bg0);color:var(--t0);display:flex;height:100vh;overflow:hidden;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,var(--sl) 0,var(--sl) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:9999;}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:var(--sc);}::-webkit-scrollbar-thumb{background:var(--sct);border-radius:3px;}
+a{color:var(--c);text-decoration:none;}button{cursor:pointer;font-family:'Outfit',sans-serif;}input,select,textarea{font-family:'JetBrains Mono',monospace;}
+input:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px var(--ibg) inset!important;-webkit-text-fill-color:var(--t0)!important;}
+/* SIDEBAR */
+#sidebar{width:var(--sw);min-width:var(--sw);background:var(--bg1);border-right:1px solid var(--b0);display:flex;flex-direction:column;height:100vh;z-index:100;}
+.logo{padding:18px 16px 14px;border-bottom:1px solid var(--b0);}
+.logo-title{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:900;letter-spacing:.08em;background:linear-gradient(135deg,var(--g),var(--c));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:lglow 4s ease-in-out infinite;}
+@keyframes lglow{0%,100%{filter:drop-shadow(0 0 6px rgba(0,212,255,.4));}50%{filter:drop-shadow(0 0 14px rgba(0,255,136,.5));}}
+.logo-sub{font-size:.66rem;color:var(--t2);font-family:'JetBrains Mono',monospace;letter-spacing:.12em;margin-top:2px;}
+nav{flex:1;padding:8px 0;overflow-y:auto;}
+.nav-sec{padding:10px 14px 3px;font-size:.62rem;font-weight:600;letter-spacing:.15em;color:var(--t3);text-transform:uppercase;}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 14px;cursor:pointer;color:var(--t1);font-size:.85rem;font-weight:500;border-left:2px solid transparent;transition:all var(--t);user-select:none;}
+.ni:hover{background:var(--bg3);color:var(--t0);}.ni.active{background:var(--c3);color:var(--c);border-left-color:var(--c);}
+.ni svg{width:15px;height:15px;flex-shrink:0;}
+.nbadge{margin-left:auto;background:var(--r);color:#fff;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px;font-family:'JetBrains Mono',monospace;min-width:17px;text-align:center;}
+.sb-bot{border-top:1px solid var(--b0);padding:10px;}
+.ses-badge{background:var(--bg3);border:1px solid var(--b0);border-radius:var(--r);padding:9px 11px;margin-bottom:8px;cursor:pointer;transition:border-color var(--t);}
+.ses-badge:hover{border-color:var(--c);}
+.ses-label{font-size:.62rem;color:var(--t2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;}
+.ses-name{font-size:.8rem;color:var(--t0);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ses-st{display:flex;align-items:center;gap:5px;margin-top:3px;}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot-g{background:var(--g);box-shadow:0 0 6px var(--g);animation:pdot 2s infinite;}.dot-d{background:var(--t2);}
+@keyframes pdot{0%,100%{opacity:1;}50%{opacity:.4;}}
+.ttheme{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border:1px solid var(--b0);border-radius:var(--r);font-size:.76rem;color:var(--t1);cursor:pointer;transition:all var(--t);}
+.ttheme:hover{border-color:var(--b1);color:var(--t0);}
+.tsw{width:30px;height:17px;background:var(--b0);border-radius:9px;position:relative;transition:background var(--t);}.tsw.on{background:var(--c);}
+.tknob{width:11px;height:11px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left var(--t);}.tsw.on .tknob{left:16px;}
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+#topbar{display:flex;align-items:center;gap:10px;padding:0 22px;height:54px;background:linear-gradient(180deg,var(--bg1) 97%,var(--c3) 100%);border-bottom:1px solid var(--b0);flex-shrink:0;}
+.tb-title{font-family:'Orbitron',monospace;font-size:.88rem;font-weight:700;letter-spacing:.06em;}
+.tb-sep{width:1px;height:18px;background:var(--b0);margin:0 2px;}.tb-sub{font-size:.75rem;color:var(--t2);font-family:'JetBrains Mono',monospace;}
+.tb-acts{margin-left:auto;display:flex;gap:7px;align-items:center;}
+#content{flex:1;overflow-y:auto;padding:22px;background:var(--bg0);}
+#sbar{height:26px;background:var(--bg1);border-top:1px solid var(--b0);display:flex;align-items:center;padding:0 14px;gap:18px;font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--t2);flex-shrink:0;}
+.sbi{display:flex;align-items:center;gap:4px;}.sbsep{width:1px;height:11px;background:var(--b0);}
+#apidot{width:6px;height:6px;border-radius:50%;background:var(--t2);transition:background .3s;}
+#apidot.ok{background:var(--g);box-shadow:0 0 5px var(--g);}#apidot.err{background:var(--r);}
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--b0);border-radius:var(--rl);padding:16px;position:relative;overflow:hidden;animation:cin .3s cubic-bezier(.34,1.1,.64,1) both;}
+@keyframes cin{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}
+.g4>.card:nth-child(1){animation-delay:.04s;}.g4>.card:nth-child(2){animation-delay:.08s;}.g4>.card:nth-child(3){animation-delay:.12s;}.g4>.card:nth-child(4){animation-delay:.16s;}
+.g2>.card:nth-child(1){animation-delay:.06s;}.g2>.card:nth-child(2){animation-delay:.12s;}
+.ctitle{font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--t2);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+.ctitle svg{width:13px;height:13px;}
+.card-g{border-color:var(--g);background:linear-gradient(135deg,var(--bg2),var(--g3));}
+.card-c{border-color:var(--c);background:linear-gradient(135deg,var(--bg2),var(--c3));}
+.glow-g{box-shadow:var(--gg);}.glow-c{box-shadow:var(--gc);}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);border:1px solid transparent;font-size:.82rem;font-weight:600;font-family:'Outfit',sans-serif;transition:all var(--t);cursor:pointer;white-space:nowrap;}
+.btn svg{width:13px;height:13px;flex-shrink:0;}
+.btn-p{background:var(--c);color:#fff;border-color:var(--c);}.btn-p:hover{filter:brightness(1.15);box-shadow:var(--gc);}
+.btn-g{background:var(--g);color:#001a0d;border-color:var(--g);font-weight:700;}.btn-g:hover{filter:brightness(1.1);box-shadow:var(--gg);}
+.btn-d{background:var(--r2);color:var(--r);border-color:var(--r);}.btn-d:hover{background:var(--r);color:#fff;}
+.btn-gh{background:transparent;color:var(--t1);border-color:var(--b0);}.btn-gh:hover{background:var(--bg3);color:var(--t0);border-color:var(--b1);}
+.btn-sm{padding:5px 10px;font-size:.74rem;}.btn-xs{padding:3px 7px;font-size:.68rem;}.btn-ico{padding:6px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+/* FORMS */
+.frow{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+label{font-size:.75rem;color:var(--t1);font-weight:500;}
+.inp,select,textarea{background:var(--ibg);border:1px solid var(--b0);border-radius:var(--r);color:var(--t0);padding:7px 11px;font-size:.81rem;transition:border-color var(--t);width:100%;outline:none;}
+.inp:focus,select:focus,textarea:focus{border-color:var(--c);box-shadow:0 0 0 2px var(--c2);}
+select option{background:var(--bg2);}textarea{resize:vertical;min-height:72px;}
+.crow{display:flex;align-items:center;gap:7px;font-size:.8rem;color:var(--t1);cursor:pointer;margin-bottom:6px;}
+.crow input[type=checkbox]{accent-color:var(--c);width:13px;height:13px;}
+/* TABLES */
+.twrap{border:1px solid var(--b0);border-radius:var(--rl);overflow:hidden;}
+table{width:100%;border-collapse:collapse;font-size:.8rem;}thead{background:var(--bg3);}
+th{padding:9px 13px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--b0);white-space:nowrap;}
+td{padding:8px 13px;border-bottom:1px solid var(--b0);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}tbody tr{transition:background var(--t);}tbody tr:hover{background:var(--bg3);}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.76rem;}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:.66rem;font-weight:700;font-family:'JetBrains Mono',monospace;white-space:nowrap;border:1px solid currentColor;}
+.b-g{background:var(--g2);color:var(--g);}.b-c{background:var(--c2);color:var(--c);}
+.b-r{background:var(--r2);color:var(--r);}.b-o{background:var(--o2);color:var(--o);}
+.b-y{background:var(--y2);color:var(--y);}.b-p{background:var(--p2);color:var(--p);}
+.b-x{background:var(--bg3);color:var(--t2);border-color:var(--b0);}
+/* SIGNAL BARS */
+.sbars{display:flex;align-items:flex-end;gap:2px;height:14px;}
+.sb{width:4px;border-radius:1px;background:var(--b0);}
+.sb:nth-child(1){height:4px;}.sb:nth-child(2){height:7px;}.sb:nth-child(3){height:10px;}.sb:nth-child(4){height:12px;}.sb:nth-child(5){height:14px;}
+.sb-e{background:var(--g);}.sb-g{background:var(--g);}.sb-f{background:var(--y);}.sb-w{background:var(--o);}.sb-p{background:var(--r);}
+/* TABS */
+.tabs{display:flex;border-bottom:1px solid var(--b0);margin-bottom:16px;}
+.tab{padding:9px 16px;font-size:.81rem;font-weight:600;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;transition:all var(--t);white-space:nowrap;}
+.tab:hover{color:var(--t0);}.tab.active{color:var(--c);border-bottom-color:var(--c);}
+.tc{display:none;}.tc.active{display:block;}
+/* PROGRESS */
+.ptrack{width:100%;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.pbar{height:100%;background:linear-gradient(90deg,var(--c),var(--g));border-radius:2px;transition:width .5s;}
+.pbar.ind{width:40%!important;animation:ind 1.5s infinite ease-in-out;}
+@keyframes ind{0%{transform:translateX(-200%);}100%{transform:translateX(500%);}}
+/* ALERTS */
+.alert{display:flex;gap:9px;padding:11px 13px;border-radius:var(--r);font-size:.8rem;margin-bottom:10px;align-items:flex-start;}
+.alert svg{width:15px;height:15px;flex-shrink:0;margin-top:1px;}
+.aw{background:var(--y2);border:1px solid var(--y);color:var(--y);}
+.ai{background:var(--c2);border:1px solid var(--c);color:var(--c);}
+.ae{background:var(--r2);border:1px solid var(--r);color:var(--r);}
+.as{background:var(--g2);border:1px solid var(--g);color:var(--g);}
+/* TOAST */
+#tc{position:fixed;bottom:38px;right:18px;display:flex;flex-direction:column;gap:7px;z-index:99999;pointer-events:none;}
+.toast{display:flex;align-items:center;gap:9px;padding:11px 15px;background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);box-shadow:var(--sh);font-size:.8rem;color:var(--t0);min-width:240px;max-width:360px;pointer-events:all;animation:tin .3s cubic-bezier(.34,1.56,.64,1);}
+@keyframes tin{from{transform:translateX(110%);opacity:0;}to{transform:none;opacity:1;}}
+.t-s{border-left:3px solid var(--g);}.t-e{border-left:3px solid var(--r);}.t-i{border-left:3px solid var(--c);}.t-w{border-left:3px solid var(--y);}
+/* MODAL */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9000;animation:fi .2s;}
+@keyframes fi{from{opacity:0;}to{opacity:1;}}
+.modal{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--rl);box-shadow:var(--sh);width:90%;max-width:600px;max-height:88vh;overflow-y:auto;animation:mi .25s cubic-bezier(.34,1.36,.64,1);}
+.modal.lg{max-width:840px;}
+@keyframes mi{from{transform:scale(.92);opacity:0;}to{transform:none;opacity:1;}}
+.mhdr{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 13px;border-bottom:1px solid var(--b0);}
+.mtitle{font-family:'Orbitron',monospace;font-size:.82rem;font-weight:700;letter-spacing:.06em;}
+.mclose{width:26px;height:26px;background:var(--bg3);border:1px solid var(--b0);border-radius:var(--r);color:var(--t1);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all var(--t);}
+.mclose:hover{background:var(--r2);color:var(--r);border-color:var(--r);}
+.mbody{padding:18px;}.mfoot{display:flex;justify-content:flex-end;gap:9px;padding:13px 18px;border-top:1px solid var(--b0);}
+/* MISC */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 20px;color:var(--t2);gap:10px;text-align:center;}
+.empty svg{opacity:.35;}.empty h3{font-size:.88rem;font-weight:600;color:var(--t1);}.empty p{font-size:.76rem;}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--b0);border-top-color:var(--c);border-radius:50%;animation:sp .7s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg);}}
+.kbd{display:inline-block;padding:1px 5px;background:var(--bg3);border:1px solid var(--b1);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--t1);}
+.sup{animation:sup .3s cubic-bezier(.34,1.1,.64,1);}
+@keyframes sup{from{transform:translateY(10px);opacity:0;}to{transform:none;opacity:1;}}
+.ppulse{animation:pp 1.5s infinite;}@keyframes pp{0%,100%{opacity:1;}50%{opacity:.5;}}
+.sev-critical{color:var(--r);}.sev-high{color:var(--o);}.sev-medium{color:var(--y);}.sev-low{color:var(--g);}.sev-info{color:var(--c);}
+/* INTERFACES */
+.iface-mon{background:var(--monbg);border:2px solid var(--monb);border-radius:var(--rl);padding:16px;position:relative;}
+.iface-mon::before{content:'MONITOR';position:absolute;top:10px;right:12px;font-size:.58rem;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.12em;color:var(--g);background:var(--g2);border:1px solid var(--g);padding:2px 8px;border-radius:10px;}
+.iface-mgd{background:var(--mgdbg);border:1.5px solid var(--mgdb);border-radius:var(--rl);padding:16px;position:relative;}
+.iface-mgd::before{content:'MANAGED';position:absolute;top:10px;right:12px;font-size:.58rem;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.12em;color:var(--c);background:var(--c2);border:1px solid var(--c);padding:2px 8px;border-radius:10px;}
+.iface-down{background:var(--bg3);border:1px dashed var(--b0);border-radius:var(--rl);padding:16px;position:relative;opacity:.65;}
+.iface-down::before{content:'DOWN';position:absolute;top:10px;right:12px;font-size:.58rem;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:.12em;color:var(--t2);background:var(--bg3);border:1px solid var(--b0);padding:2px 8px;border-radius:10px;}
+.iface-name{font-family:'Orbitron',monospace;font-size:1rem;font-weight:700;margin-bottom:6px;}
+.iface-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:.74rem;color:var(--t2);margin-bottom:10px;}
+.iface-sec{font-family:'Orbitron',monospace;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--t2);margin:16px 0 9px;display:flex;align-items:center;gap:8px;}
+.iface-sec::after{content:'';flex:1;height:1px;background:var(--b0);}
+/* FINDING */
+.fitem{border:1px solid var(--b0);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;background:var(--bg3);transition:border-color var(--t);}
+.fitem:hover{border-color:var(--b1);}
+.fhdr{display:flex;align-items:flex-start;gap:7px;margin-bottom:6px;flex-wrap:wrap;}
+.ftitle{font-weight:600;font-size:.84rem;flex:1;min-width:0;}
+.ftext{font-size:.76rem;color:var(--t1);white-space:pre-wrap;line-height:1.6;}
+.fpre{font-size:.71rem;color:var(--t2);background:var(--bg0);border-radius:6px;padding:8px 10px;white-space:pre-wrap;font-family:'JetBrains Mono',monospace;margin-top:6px;line-height:1.5;max-height:150px;overflow-y:auto;}
+/* HOST */
+.hitem{border:1px solid var(--b0);border-radius:var(--r);overflow:hidden;margin-bottom:8px;}
+.hhdr{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--bg3);cursor:pointer;flex-wrap:wrap;}
+.hhdr:hover{background:var(--bg4);}
+.hdetail{padding:12px 13px;background:var(--bg2);border-top:1px solid var(--b0);}
+/* SEED TAGS */
+.seed-box{display:flex;flex-wrap:wrap;gap:5px;min-height:34px;padding:5px;background:var(--ibg);border:1px solid var(--b0);border-radius:var(--r);cursor:text;transition:border-color var(--t);}
+.seed-box:focus-within{border-color:var(--c);box-shadow:0 0 0 2px var(--c2);}
+.stag{display:flex;align-items:center;gap:4px;background:var(--c2);border:1px solid var(--c);color:var(--c);border-radius:20px;padding:2px 8px;font-size:.74rem;font-family:'JetBrains Mono',monospace;}
+.stag-x{cursor:pointer;opacity:.7;font-size:.9rem;}.stag-x:hover{opacity:1;}
+#sinput{border:none;outline:none;background:transparent;color:var(--t0);font-family:'JetBrains Mono',monospace;font-size:.78rem;min-width:120px;flex:1;padding:2px 4px;}
+/* MUTATIONS */
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px;}
+.mitem{background:var(--bg3);border:1px solid var(--b0);border-radius:var(--r);padding:9px 11px;cursor:pointer;transition:all var(--t);}
+.mitem:hover{border-color:var(--b1);}.mitem.on{border-color:var(--c);background:var(--c3);}
+.mlabel{font-size:.79rem;font-weight:600;color:var(--t0);margin-bottom:2px;display:flex;align-items:center;gap:6px;}
+.mlabel input{accent-color:var(--c);}
+.mex{font-size:.68rem;color:var(--c);font-family:'JetBrains Mono',monospace;margin-bottom:2px;}
+.mdesc{font-size:.65rem;color:var(--t2);}
+/* COUNTDOWN */
+.cdown{font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:var(--y);text-align:center;text-shadow:0 0 20px rgba(255,214,10,.4);}
+.cdown.low{color:var(--r);animation:pp 1s infinite;}.cdown.done{color:var(--g);}
+/* NET STATUS */
+.net-col{font-size:.62rem;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-family:'JetBrains Mono',monospace;}
+.net-e{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--b0);}
+.net-e:last-child{border-bottom:none;}
+</style>
+</head>
+<body><aside id="sidebar">
+  <div class="logo"><div class="logo-title">WFAudit</div><div class="logo-sub">// WIFI AUDIT PLATFORM v3</div></div>
+  <nav id="nav">
+    <div class="nav-sec">Principal</div>
+    <div class="ni active" data-s="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</div>
+    <div class="ni" data-s="sessions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Sesiones</div>
+    <div class="nav-sec">Recopilación</div>
+    <div class="ni" data-s="interfaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>Interfaces</div>
+    <div class="ni" data-s="wifiscan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Escaneo WiFi</div>
+    <div class="ni" data-s="recon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>Recon (nmap)</div>
+    <div class="nav-sec">Explotación</div>
+    <div class="ni" data-s="handshake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>Handshake/Crack</div>
+    <div class="ni" data-s="advanced"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Avanzado</div>
+    <div class="ni" data-s="attacks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Ataques</div>
+    <div class="nav-sec">Gestión</div>
+    <div class="ni" data-s="captures"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Capturas</div>
+    <div class="ni" data-s="wordlists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Wordlists</div>
+    <div class="ni" data-s="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>Sistema</div>
+  </nav>
+  <div class="sb-bot">
+    <div class="ses-badge" id="ses-badge" onclick="goto('sessions')">
+      <div class="ses-label">Sesión Activa</div>
+      <div class="ses-name" id="sb-ses-name">Sin sesión</div>
+      <div class="ses-st"><div class="dot dot-d" id="sb-ses-dot"></div><span style="font-size:.68rem;color:var(--t2)" id="sb-ses-st">Selecciona una sesión</span></div>
+    </div>
+    <div class="ttheme" onclick="toggleTheme()">
+      <span id="theme-lbl">Modo Oscuro</span>
+      <div class="tsw on" id="tsw"><div class="tknob"></div></div>
+    </div>
+  </div>
+</aside>
+<div id="main">
+  <div id="topbar">
+    <span class="tb-title" id="tb-title">DASHBOARD</span>
+    <div class="tb-sep"></div>
+    <span class="tb-sub" id="tb-sub">Vista general</span>
+    <div class="tb-acts" id="tb-acts"></div>
+  </div>
+  <div id="content" class="sup"></div>
+  <div id="sbar">
+    <div class="sbi"><div id="apidot"></div><span id="api-txt">Conectando...</span></div>
+    <div class="sbsep"></div>
+    <div class="sbi"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span id="sb-ses">Sin sesión</span></div>
+    <div class="sbsep"></div>
+    <div class="sbi"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span id="sb-procs">0 procesos</span></div>
+    <span id="sb-time" class="sbi" style="margin-left:auto">--:--:--</span>
+  </div>
+</div>
+<div id="tc"></div>
+<div id="mr"></div>
+<script>
+const API='http://localhost:8000';
+const ST={section:'dashboard',theme:localStorage.getItem('theme')||'dark',activeSession:JSON.parse(localStorage.getItem('activeSession')||'null'),processes:[],apiOk:false,lastScan:JSON.parse(localStorage.getItem('lastScan')||'null')};
+const FP=JSON.parse(localStorage.getItem('FP')||'{}');
+function saveFP(pid){const p=document.getElementById(pid);if(!p)return;const d={};p.querySelectorAll('[data-p]').forEach(e=>{d[e.id]=e.type==='checkbox'?e.checked:e.value;});FP[pid]=d;localStorage.setItem('FP',JSON.stringify(FP));}
+function restFP(pid){const d=FP[pid];if(!d)return;Object.entries(d).forEach(([id,v])=>{const e=document.getElementById(id);if(!e)return;e.type==='checkbox'?e.checked=v:e.value=v;});}
+function saveAllFP(){document.querySelectorAll('[data-pp]').forEach(e=>saveFP(e.dataset.pp));}
+async function apiFetch(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts});if(!res.ok){let m=`HTTP ${res.status}`;try{const j=await res.json();m=j.detail||j.error||m;}catch{}throw new Error(m);}const ct=res.headers.get('content-type')||'';if(ct.includes('application/json'))return res.json();return res.text();}
+const A={
+  health:()=>apiFetch('/system/health'),preflight:()=>apiFetch('/system/preflight'),
+  procs:()=>apiFetch('/system/processes'),cancelProc:id=>apiFetch(`/system/processes/${id}/cancel`,{method:'POST'}),
+  oui:mac=>apiFetch(`/system/oui/${mac}`),
+  ifaces:()=>apiFetch('/interfaces/'),netSt:()=>apiFetch('/interfaces/network-status'),
+  setMon:(i,k=false)=>apiFetch(`/interfaces/${i}/monitor?kill_conflicting=${k}`,{method:'POST'}),
+  setMgd:i=>apiFetch(`/interfaces/${i}/managed`,{method:'POST'}),
+  spoofMac:(i,m)=>apiFetch(`/interfaces/${i}/mac${m?`?new_mac=${m}`:''}`,{method:'POST'}),
+  setTx:(i,p)=>apiFetch(`/interfaces/${i}/txpower?power_dbm=${p}`,{method:'POST'}),
+  startScan:b=>apiFetch('/wifi/scan',{method:'POST',body:JSON.stringify(b)}),
+  getScan:id=>apiFetch(`/wifi/scans/${id}`),listScans:()=>apiFetch('/wifi/scans'),
+  stopScan:id=>apiFetch(`/wifi/scans/${id}/stop`,{method:'POST'}),
+  captureHS:b=>apiFetch('/wifi/handshake',{method:'POST',body:JSON.stringify(b)}),
+  crack:b=>apiFetch('/wifi/crack',{method:'POST',body:JSON.stringify(b)}),
+  deauth:b=>apiFetch('/wifi/deauth',{method:'POST',body:JSON.stringify(b)}),
+  startRecon:b=>apiFetch('/recon/scan',{method:'POST',body:JSON.stringify(b)}),
+  listRecon:()=>apiFetch('/recon/scans'),getRecon:id=>apiFetch(`/recon/scans/${id}`),
+  pmkidCap:b=>apiFetch('/advanced/pmkid/capture',{method:'POST',body:JSON.stringify(b)}),
+  pmkidCrack:b=>apiFetch('/advanced/pmkid/crack',{method:'POST',body:JSON.stringify(b)}),
+  aplStart:b=>apiFetch('/advanced/apless/start',{method:'POST',body:JSON.stringify(b)}),
+  aplStop:()=>apiFetch('/advanced/apless/stop',{method:'POST'}),
+  aplSt:()=>apiFetch('/advanced/apless/status'),
+  wpa3:b=>apiFetch('/advanced/wpa3/attack',{method:'POST',body:JSON.stringify(b)}),
+  etStart:b=>apiFetch('/attacks/evil-twin/start',{method:'POST',body:JSON.stringify(b)}),
+  etStop:()=>apiFetch('/attacks/evil-twin/stop',{method:'POST'}),
+  etSt:()=>apiFetch('/attacks/evil-twin/status'),
+  etFlows:(n=100)=>apiFetch(`/attacks/evil-twin/flows?limit=${n}`),
+  mitmStart:b=>apiFetch('/attacks/mitm/start',{method:'POST',body:JSON.stringify(b)}),
+  mitmStop:()=>apiFetch('/attacks/mitm/stop',{method:'POST'}),
+  mitmSt:()=>apiFetch('/attacks/mitm/status'),
+  mitmFlows:(n=50,c=false)=>apiFetch(`/attacks/mitm/flows?limit=${n}&credentials_only=${c}`),
+  caps:(sid)=>apiFetch('/captures/'+(sid?`?session_id=${sid}`:'')),
+  checkHS:fp=>apiFetch(`/captures/check-handshake?filepath=${encodeURIComponent(fp)}`,{method:'POST'}),
+  delCap:fp=>apiFetch(`/captures/?filepath=${encodeURIComponent(fp)}`,{method:'DELETE'}),
+  sessions:()=>apiFetch('/sessions/'),getSession:id=>apiFetch(`/sessions/${id}`),
+  createSession:b=>apiFetch('/sessions/',{method:'POST',body:JSON.stringify(b)}),
+  closeSession:id=>apiFetch(`/sessions/${id}/close`,{method:'POST'}),
+  reopenSession:id=>apiFetch(`/sessions/${id}/reopen`,{method:'POST'}),
+  addFinding:(sid,b)=>apiFetch(`/sessions/${sid}/findings`,{method:'POST',body:JSON.stringify(b)}),
+  updFinding:(sid,fid,b)=>apiFetch(`/sessions/${sid}/findings/${fid}`,{method:'PATCH',body:JSON.stringify(b)}),
+  delFinding:(sid,fid)=>apiFetch(`/sessions/${sid}/findings/${fid}`,{method:'DELETE'}),
+  report:id=>apiFetch(`/sessions/${id}/report`),
+  wls:()=>apiFetch('/wordlists'),genWL:b=>apiFetch('/wordlists/generate',{method:'POST',body:JSON.stringify(b)}),
+  previewWL:b=>apiFetch('/wordlists/preview',{method:'POST',body:JSON.stringify(b)}),
+  estimateWL:b=>apiFetch('/wordlists/estimate',{method:'POST',body:JSON.stringify(b)}),
+  delWL:fn=>apiFetch(`/wordlists/${fn}`,{method:'DELETE'}),
+  presets:()=>apiFetch('/wordlists/presets/info'),
+};
+function toast(msg,type='info',dur=4000){
+  const icons={success:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`,error:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,info:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,warn:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`};
+  const el=document.createElement('div');el.className=`toast t-${type}`;el.innerHTML=`${icons[type]||icons.info}<span>${msg}</span>`;
+  document.getElementById('tc').appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';},dur-300);setTimeout(()=>el.remove(),dur);
+}
+function showModal(title,body,footer='',lg=false){document.getElementById('mr').innerHTML=`<div class="mov" onclick="if(event.target===this)closeModal()"><div class="modal${lg?' lg':''}"><div class="mhdr"><span class="mtitle">${title}</span><button class="mclose" onclick="closeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div><div class="mbody">${body}</div>${footer?`<div class="mfoot">${footer}</div>`:''}</div></div>`;}
+function closeModal(){document.getElementById('mr').innerHTML='';}
+function confirmDlg(msg,fn){showModal('Confirmar',`<p style="color:var(--t1)">${msg}</p>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-d" onclick="closeModal();(${fn.toString()})()">Confirmar</button>`);}
+function setC(h){document.getElementById('content').innerHTML=h;}
+function setTB(title,sub,acts=''){document.getElementById('tb-title').textContent=title;document.getElementById('tb-sub').textContent=sub;document.getElementById('tb-acts').innerHTML=acts;}
+const SVG={
+  wifi:`<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/>`,
+  folder:`<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>`,
+  shield:`<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+  zap:`<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>`,
+  search:`<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
+  key:`<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>`,
+  plus:`<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>`,
+  trash:`<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>`,
+  edit:`<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>`,
+  stop:`<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>`,
+  play:`<polygon points="5 3 19 12 5 21 5 3"/>`,
+  refresh:`<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>`,
+  report:`<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>`,
+  check:`<polyline points="20 6 9 17 4 12"/>`,
+  x:`<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
+  info:`<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>`,
+  warn:`<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
+  download:`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
+  cpu:`<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>`,
+  eye:`<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`,
+  terminal:`<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>`,
+};
+function ic(n,s=14){return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SVG[n]||''}</svg>`;}
+const CI={wifi:'📡',network:'🌐',router:'🏠',credentials:'🔑',encryption:'🔒',access_control:'🚫',other:'📋'};
+const CL={wifi:'WiFi',network:'Network',router:'Router',credentials:'Credentials',encryption:'Encryption',access_control:'Access Control',other:'Other'};
+function sbadge(s){const m={WPA3:'b-g',WPA2:'b-c',WPA:'b-y',WEP:'b-o',OPEN:'b-r'};return `<span class="badge ${m[s]||'b-x'}">${s}</span>`;}
+function sevb(s){const m={critical:'b-r',high:'b-o',medium:'b-y',low:'b-g',info:'b-c'};return `<span class="badge ${m[s]||'b-x'}">${(s||'').toUpperCase()}</span>`;}
+function stb(s){const m={running:'b-y',completed:'b-g',failed:'b-r',cancelled:'b-x',active:'b-g',closed:'b-x'};return `<span class="badge ${m[s]||'b-x'}">${s}</span>`;}
+function sigb(d){const t=[-90,-80,-70,-60,-50];let c='sb-p';if(d>=-50)c='sb-e';else if(d>=-60)c='sb-g';else if(d>=-70)c='sb-f';else if(d>=-80)c='sb-w';return `<div class="sbars">${t.map((_,i)=>`<div class="sb ${d>t[i]?c:''}"></div>`).join('')}</div>`;}
+function fd(d){if(!d)return '—';try{return new Date(d).toLocaleString('es-ES',{dateStyle:'short',timeStyle:'short'});}catch{return d;}}
+function fb(n){if(!n)return '0 B';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<3){n/=1024;i++;}return `${n.toFixed(i?1:0)} ${u[i]}`;}
+function nl2(s){return (s||'').replace(/\n/g,'<br>');}
+const SM={dashboard:{t:'DASHBOARD',s:'Vista general'},sessions:{t:'SESIONES',s:'Gestión de auditorías'},interfaces:{t:'INTERFACES',s:'Adaptadores WiFi'},wifiscan:{t:'ESCANEO WIFI',s:'Detección de APs y clientes'},recon:{t:'RECONOCIMIENTO',s:'Descubrimiento con nmap'},handshake:{t:'HANDSHAKE / CRACK',s:'Captura y crackeo WPA'},advanced:{t:'AVANZADO',s:'PMKID · AP-Less · WPA3'},attacks:{t:'ATAQUES',s:'Evil Twin · MITM'},captures:{t:'CAPTURAS',s:'Gestión de capturas'},wordlists:{t:'WORDLISTS',s:'Generador de diccionarios'},system:{t:'SISTEMA',s:'Herramientas y procesos'}};
+function goto(s){saveAllFP();ST.section=s;document.querySelectorAll('.ni').forEach(e=>e.classList.toggle('active',e.dataset.s===s));const m=SM[s]||{};setTB(m.t||s.toUpperCase(),m.s||'',`<button class="btn btn-gh btn-sm" onclick="${s}()">${ic('refresh')} Actualizar</button>`);const fn=window[s];if(typeof fn==='function')fn();}
+document.getElementById('nav').addEventListener('click',e=>{const ni=e.target.closest('.ni');if(ni?.dataset.s)goto(ni.dataset.s);});
+function applyTheme(t){ST.theme=t;document.documentElement.setAttribute('data-theme',t);localStorage.setItem('theme',t);const l=t==='light';document.getElementById('theme-lbl').textContent=l?'Modo Claro':'Modo Oscuro';document.getElementById('tsw').classList.toggle('on',!l);}
+function toggleTheme(){applyTheme(ST.theme==='dark'?'light':'dark');}
+function setSession(s){ST.activeSession=s;localStorage.setItem('activeSession',JSON.stringify(s));updateSB();}
+function updateSB(){const s=ST.activeSession;document.getElementById('sb-ses-name').textContent=s?s.name:'Sin sesión';const dot=document.getElementById('sb-ses-dot'),st=document.getElementById('sb-ses-st');if(s){const a=s.status==='active';dot.className=`dot ${a?'dot-g':'dot-d'}`;st.textContent=a?'● ACTIVA':'○ CERRADA';st.style.color=a?'var(--g)':'var(--t2)';document.getElementById('sb-ses').textContent=`Sesión: ${s.name}`;}else{dot.className='dot dot-d';st.textContent='Selecciona una sesión';st.style.color='var(--t2)';document.getElementById('sb-ses').textContent='Sin sesión activa';}}
+async function pollProcs(){try{ST.processes=await A.procs();const r=ST.processes.filter(p=>p.status==='running').length;document.getElementById('sb-procs').textContent=`${r} proceso${r!==1?'s':''} activo${r!==1?'s':''}`;const old=document.getElementById('pbadge');if(r>0){if(!old){const ni=document.querySelector('[data-s="system"]');ni&&ni.insertAdjacentHTML('beforeend',`<span class="nbadge" id="pbadge">${r}</span>`);}else old.textContent=r;}else old&&old.remove();}catch{}}
+async function checkHealth(){try{await A.health();ST.apiOk=true;document.getElementById('apidot').className='ok';document.getElementById('api-txt').textContent='API conectada';}catch{ST.apiOk=false;document.getElementById('apidot').className='err';document.getElementById('api-txt').textContent='API sin conexión';}}
+function startClock(){setInterval(()=>{document.getElementById('sb-time').textContent=new Date().toLocaleTimeString('es-ES');},1000);}
+function swTab(cid,pref,idx){document.querySelectorAll(`#${cid} .tab`).forEach((t,i)=>t.classList.toggle('active',i===idx));document.querySelectorAll(`[id^="${pref}-"]`).forEach((c,i)=>c.classList.toggle('active',i===idx));}
+</script><script>
+// ======== DASHBOARD ========
+async function dashboard(){
+  setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
+  let pf=null,procs=[],sess=[];
+  try{[pf,procs,sess]=await Promise.all([A.preflight().catch(()=>null),A.procs().catch(()=>[]),A.sessions().catch(()=>[])]);}catch{}
+  const sys=pf?.system||{},tools=pf?.tools||{},tl=Object.entries(tools),inst=tl.filter(([,v])=>v.installed).length,miss=pf?.missing_critical||[],run=procs.filter(p=>p.status==='running'),s=ST.activeSession,fi=s?.findings||[],sc={critical:0,high:0,medium:0,low:0,info:0};
+  fi.forEach(f=>{if(f.severity in sc)sc[f.severity]++;});
+  setC(`<div class="sup">
+    ${miss.length?`<div class="alert aw" style="margin-bottom:14px">${ic('warn')}<div><strong>Críticos faltantes:</strong> ${miss.join(', ')} — <span onclick="goto('system')" style="cursor:pointer;text-decoration:underline">Ver sistema</span></div></div>`:''}
+    <div class="g4" style="margin-bottom:14px">
+      <div class="card ${pf?.ready?'card-g':''}">
+        <div class="ctitle">${ic('cpu')} Sistema</div>
+        <div style="font-family:'Orbitron',monospace;font-size:.95rem;font-weight:700;color:var(--g)">${sys.hostname||'—'}</div>
+        <div style="font-size:.7rem;color:var(--t2);margin:4px 0 8px">${sys.os||'—'}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">${sys.is_root?`<span class="badge b-g">ROOT ✓</span>`:`<span class="badge b-r">NO ROOT</span>`}${sys.cpu_count?`<span class="badge b-x">${sys.cpu_count} cores</span>`:''}</div>
+      </div>
+      <div class="card">
+        <div class="ctitle">${ic('zap')} Herramientas</div>
+        <div style="font-family:'Orbitron',monospace;font-size:1.5rem;font-weight:700">${inst}<span style="font-size:.85rem;color:var(--t2)">/${tl.length}</span></div>
+        <div class="ptrack" style="margin:8px 0 5px"><div class="pbar" style="width:${tl.length?Math.round(inst/tl.length*100):0}%"></div></div>
+        <div style="font-size:.7rem;color:${miss.length?'var(--r)':'var(--g)'}">${miss.length?`${miss.length} críticos faltantes`:'Todas OK'}</div>
+      </div>
+      <div class="card">
+        <div class="ctitle">${ic('folder')} Sesiones</div>
+        <div style="font-family:'Orbitron',monospace;font-size:1.5rem;font-weight:700">${sess.length}</div>
+        <div style="font-size:.7rem;color:var(--t2);margin-top:4px">${sess.filter(x=>x.status==='active').length} activas</div>
+        <button class="btn btn-gh btn-xs" style="margin-top:8px" onclick="goto('sessions')">Gestionar →</button>
+      </div>
+      <div class="card">
+        <div class="ctitle">${ic('refresh')} Procesos</div>
+        <div style="font-family:'Orbitron',monospace;font-size:1.5rem;font-weight:700;color:${run.length?'var(--y)':'var(--t0)'}" class="${run.length?'ppulse':''}">${run.length}</div>
+        <div style="font-size:.7rem;color:var(--t2);margin-top:4px">${procs.length} total</div>
+        <button class="btn btn-gh btn-xs" style="margin-top:8px" onclick="goto('system')">Ver →</button>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div class="card ${s?'card-c glow-c':''}">
+        <div class="ctitle">${ic('folder')} Sesión Activa</div>
+        ${s?`<div style="font-family:'Orbitron',monospace;font-size:.95rem;font-weight:700;margin-bottom:4px">${s.name}</div>
+          <div style="font-size:.74rem;color:var(--t2);margin-bottom:8px">${s.company||'—'} · ${s.auditor||'—'} · <span class="mono">${s.id}</span></div>
+          ${stb(s.status)}
+          ${fi.length>0?`<div style="margin:10px 0 6px"><div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-bottom:7px">${Object.entries(sc).filter(([,v])=>v>0).map(([sv,n])=>`<div style="flex:${n};background:var(--${sv==='critical'?'r':sv==='high'?'o':sv==='medium'?'y':sv==='low'?'g':'c'})" title="${sv}:${n}"></div>`).join('')}</div><div style="display:flex;gap:5px;flex-wrap:wrap">${Object.entries(sc).filter(([,v])=>v>0).map(([sv,n])=>`<span class="badge b-${sv==='critical'?'r':sv==='high'?'o':sv==='medium'?'y':sv==='low'?'g':'c'}">${sv}:${n}</span>`).join('')}</div></div>`:`<div style="font-size:.76rem;color:var(--t2);margin-top:8px">Sin hallazgos</div>`}
+          <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-gh btn-sm" onclick="goto('sessions')">Ver</button><button class="btn btn-p btn-sm" onclick="showAddF('${s.id}')">${ic('plus')} Hallazgo</button><button class="btn btn-gh btn-sm" onclick="showReport('${s.id}')">${ic('report')}</button></div>`:
+        `<div class="empty" style="padding:22px">${ic('folder',36)}<h3>Sin sesión activa</h3><button class="btn btn-g btn-sm" style="margin-top:10px" onclick="goto('sessions')">${ic('plus')} Nueva</button></div>`}
+      </div>
+      <div class="card">
+        <div class="ctitle">${ic('zap')} Accesos Rápidos</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${[['wifi','Escanear WiFi','wifiscan','var(--c)'],['search','Reconocimiento','recon','var(--g)'],['key','Handshake','handshake','var(--y)'],['shield','Evil Twin','attacks','var(--o)'],['zap','Avanzado','advanced','var(--p)'],['download','Wordlists','wordlists','var(--c)']].map(([i2,l,s2,col])=>`<div onclick="goto('${s2}')" style="padding:12px;background:var(--bg3);border:1px solid var(--b0);border-radius:9px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='${col}'" onmouseout="this.style.borderColor='var(--b0)'"><div style="color:${col}">${ic(i2,16)}</div><div style="font-size:.8rem;font-weight:600;margin-top:5px">${l}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px"><div class="ctitle" style="margin-bottom:0">${ic('zap')} Herramientas</div><button class="btn btn-gh btn-xs" onclick="goto('system')">Ver todo →</button></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:6px">
+        ${tl.slice(0,16).map(([name,t])=>`<div style="display:flex;align-items:center;gap:7px;padding:7px;background:var(--bg3);border-radius:6px;border:1px solid ${t.installed?'rgba(0,255,136,.2)':'rgba(255,59,92,.15)'}"><div style="width:6px;height:6px;border-radius:50%;background:${t.installed?'var(--g)':'var(--r)'};flex-shrink:0"></div><span class="mono" style="font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${name}</span></div>`).join('')}
+      </div>
+    </div>
+    ${run.length?`<div class="card" style="margin-top:14px"><div class="ctitle">${ic('refresh')} Procesos Activos</div><div class="twrap"><table><thead><tr><th>ID</th><th>Comando</th><th>Estado</th><th>Inicio</th><th></th></tr></thead><tbody>${run.map(p=>`<tr><td class="mono" style="font-size:.7rem">${p.id}</td><td class="mono" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;color:var(--t2)">${p.command}</td><td>${stb(p.status)}</td><td class="mono" style="font-size:.68rem;color:var(--t2)">${fd(p.started_at)}</td><td><button class="btn btn-d btn-xs" onclick="cancelPD('${p.id}')">Stop</button></td></tr>`).join('')}</tbody></table></div></div>`:''}
+  </div>`);}
+async function cancelPD(id){try{await A.cancelProc(id);toast('Cancelado','success');dashboard();}catch(e){toast(e.message,'error');}}
+// ======== SESSIONS ========
+let _sess=[];
+async function sessions(){setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);try{_sess=await A.sessions();renderSess();}catch(e){setC(`<div class="alert ae">${ic('x')} ${e.message}</div>`);}}
+function renderSess(){
+  document.getElementById('tb-acts').innerHTML=`<button class="btn btn-gh btn-sm" onclick="sessions()">${ic('refresh')} Actualizar</button><button class="btn btn-g btn-sm" onclick="showCS()">${ic('plus')} Nueva</button>`;
+  if(!_sess.length){setC(`<div class="empty">${ic('folder',48)}<h3>Sin sesiones</h3><button class="btn btn-g" style="margin-top:12px" onclick="showCS()">${ic('plus')} Crear</button></div>`);return;}
+  setC(`<div class="sup" style="display:flex;flex-direction:column;gap:11px">${_sess.map(s=>{const a=s.id===ST.activeSession?.id,fi=s.findings||[],cr=fi.filter(f=>f.severity==='critical').length,hi=fi.filter(f=>f.severity==='high').length;return `<div class="card ${a?'card-c glow-c':''}" style="cursor:pointer" onclick="viewSes('${s.id}')"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span style="font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700">${s.name}</span>${stb(s.status)}${a?`<span class="badge b-c">▶ ACTIVA</span>`:''}</div><div style="font-size:.75rem;color:var(--t2);margin-bottom:7px">${s.company||'—'} · <strong style="color:var(--t1)">${s.auditor||'—'}</strong> · <span class="mono">${s.id}</span> · ${fd(s.created_at)}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge b-x">${fi.length} hallazgos</span>${cr?`<span class="badge b-r">⚠ ${cr} críticos</span>`:''}${hi?`<span class="badge b-o">${hi} altos</span>`:''}</div></div><div style="display:flex;gap:6px;flex-shrink:0">${!a?`<button class="btn btn-gh btn-sm" onclick="event.stopPropagation();actSes('${s.id}')">Activar</button>`:''}<button class="btn btn-p btn-sm" onclick="event.stopPropagation();viewSes('${s.id}')">Ver →</button></div></div></div>`;}).join('')}</div>`);}
+async function actSes(id){const s=_sess.find(x=>x.id===id);if(s){setSession(s);toast(`"${s.name}" activada`,'success');renderSess();}}
+async function viewSes(id){
+  let s;try{s=await A.getSession(id);}catch(e){toast(e.message,'error');return;}
+  const fi=s.findings||[],SO=['critical','high','medium','low','info'],SC={critical:'var(--r)',high:'var(--o)',medium:'var(--y)',low:'var(--g)',info:'var(--c)'},isA=s.id===ST.activeSession?.id;
+  document.getElementById('tb-acts').innerHTML=`<button class="btn btn-gh btn-sm" onclick="sessions()">← Sesiones</button>`;
+  const sevRow=SO.map(sv=>{const n=fi.filter(f=>f.severity===sv).length;return `<div style="text-align:center;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--b0);flex:1;min-width:60px"><div class="sev-${sv}" style="font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:700">${n}</div><div style="font-size:.62rem;color:var(--t2);text-transform:uppercase;margin-top:2px;white-space:nowrap">${sv}</div></div>`;}).join('');
+  const fiHTML=fi.length?SO.flatMap(sv=>{const gr=fi.filter(f=>f.severity===sv);if(!gr.length)return[];return[`<div style="margin-bottom:16px"><div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${SC[sv]};margin-bottom:8px">${ic('warn',12)} ${sv.toUpperCase()} (${gr.length})</div>${gr.map(f=>`<div class="fitem"><div class="fhdr">${sevb(f.severity)}<span class="badge b-x">${CI[f.category]||'📋'} ${CL[f.category]||f.category}</span><span class="ftitle">${f.title}</span><div style="display:flex;gap:3px;margin-left:auto;flex-shrink:0"><button class="btn btn-gh btn-xs btn-ico" onclick="editF('${s.id}','${f.id}',${JSON.stringify(JSON.stringify(f))})">${ic('edit',12)}</button><button class="btn btn-d btn-xs btn-ico" onclick="delF('${s.id}','${f.id}')">${ic('trash',12)}</button></div></div>${f.description?`<div class="ftext" style="margin-bottom:6px;color:var(--t1)">${nl2(f.description)}</div>`:''} ${f.evidence?`<div style="font-size:.68rem;color:var(--t2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em">Evidencia</div><div class="fpre">${f.evidence}</div>`:''} ${f.recommendation?`<div style="margin-top:8px;font-size:.74rem;color:var(--c);display:flex;gap:5px;align-items:flex-start">${ic('info',13)}<span style="white-space:pre-wrap">${f.recommendation}</span></div>`:''}</div>`).join('')}</div>`];}).join(''):
+  `<div class="empty" style="padding:36px">${ic('check',36)}<h3>Sin hallazgos</h3></div>`;
+  setC(`<div class="sup"><div class="card ${isA?'card-c':''}" style="margin-bottom:14px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div style="font-family:'Orbitron',monospace;font-size:1rem;font-weight:700;margin-bottom:4px">${s.name}</div><div style="font-size:.76rem;color:var(--t2)">${s.company||'—'} · ${s.auditor||'—'} · <span class="mono">${s.id}</span> · ${fd(s.created_at)}</div>${s.notes?`<div style="margin-top:8px;font-size:.75rem;color:var(--t1);border-left:2px solid var(--c);padding-left:9px;white-space:pre-wrap">${s.notes}</div>`:''}</div><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">${stb(s.status)}${isA?`<span class="badge b-c">▶ ACTIVA</span>`:`<button class="btn btn-gh btn-sm" onclick="actSes('${s.id}')">Activar</button>`}${s.status==='active'?`<button class="btn btn-gh btn-sm" onclick="closeS('${s.id}')">Cerrar</button>`:`<button class="btn btn-gh btn-sm" onclick="reopenS('${s.id}')">Reabrir</button>`}<button class="btn btn-gh btn-sm" onclick="showReport('${s.id}')">${ic('report')} Informe</button><button class="btn btn-g btn-sm" onclick="showAddF('${s.id}')">${ic('plus')} Hallazgo</button></div></div></div>
+  <div style="display:flex;gap:8px;margin-bottom:16px">${sevRow}</div>
+  <div class="card"><div class="ctitle">${ic('warn')} Hallazgos (${fi.length})</div>${fiHTML}</div></div>`);}
+async function closeS(id){try{await A.closeSession(id);toast('Cerrada','success');if(ST.activeSession?.id===id){ST.activeSession.status='closed';updateSB();}viewSes(id);}catch(e){toast(e.message,'error');}}
+async function reopenS(id){try{await A.reopenSession(id);toast('Reabierta','success');viewSes(id);}catch(e){toast(e.message,'error');}}
+function showCS(){showModal('Nueva Sesión',`<div class="frow"><label>Nombre *</label><input id="s-name" class="inp" placeholder="Auditoría ACME Q4 2026"></div><div class="fgrid"><div class="frow"><label>Empresa</label><input id="s-co" class="inp"></div><div class="frow"><label>Auditor</label><input id="s-au" class="inp"></div></div><div class="frow"><label>Notas</label><textarea id="s-no" class="inp" placeholder="Alcance..."></textarea></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-g" onclick="createS()">Crear</button>`);}
+async function createS(){const n=document.getElementById('s-name')?.value?.trim();if(!n){toast('Nombre obligatorio','warn');return;}try{const s=await A.createSession({name:n,company:document.getElementById('s-co')?.value?.trim()||'',auditor:document.getElementById('s-au')?.value?.trim()||'',notes:document.getElementById('s-no')?.value?.trim()||''});closeModal();setSession(s);toast(`"${s.name}" creada`,'success');sessions();}catch(e){toast(e.message,'error');}}
+function showAddF(sid){showModal('Añadir Hallazgo',`<div class="fgrid"><div class="frow"><label>Severidad *</label><select id="f-sv" class="inp"><option value="critical">🔴 Critical</option><option value="high">🟠 High</option><option value="medium" selected>🟡 Medium</option><option value="low">🟢 Low</option><option value="info">🔵 Info</option></select></div><div class="frow"><label>Categoría *</label><select id="f-ca" class="inp">${Object.entries(CI).map(([v,ico])=>`<option value="${v}">${ico} ${CL[v]}</option>`).join('')}</select></div></div><div class="frow"><label>Título *</label><input id="f-ti" class="inp" placeholder="Título del hallazgo"></div><div class="frow"><label>Descripción</label><textarea id="f-de" class="inp" placeholder="Descripción (soporta saltos de línea)..."></textarea></div><div class="frow"><label>Evidencia</label><textarea id="f-ev" class="inp" placeholder="Output, datos técnicos..."></textarea></div><div class="frow"><label>Recomendación</label><textarea id="f-re" class="inp" placeholder="Cómo solucionar..."></textarea></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-g" onclick="saveF('${sid}')">Guardar</button>`);}
+async function saveF(sid,fid=null){const b={session_id:sid,severity:document.getElementById('f-sv').value,category:document.getElementById('f-ca').value,title:document.getElementById('f-ti').value.trim(),description:document.getElementById('f-de').value.trim(),evidence:document.getElementById('f-ev').value.trim(),recommendation:document.getElementById('f-re').value.trim()};if(!b.title){toast('Título obligatorio','warn');return;}try{fid?await A.updFinding(sid,fid,b):await A.addFinding(sid,b);closeModal();toast(fid?'Actualizado':'Añadido','success');if(ST.activeSession?.id===sid){const u=await A.getSession(sid).catch(()=>null);if(u)setSession(u);}viewSes(sid);}catch(e){toast(e.message,'error');}}
+function editF(sid,fid,js){const f=JSON.parse(js);showModal('Editar Hallazgo',`<div class="fgrid"><div class="frow"><label>Severidad</label><select id="f-sv" class="inp">${['critical','high','medium','low','info'].map(s=>`<option value="${s}" ${f.severity===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="frow"><label>Categoría</label><select id="f-ca" class="inp">${Object.entries(CI).map(([v,ico])=>`<option value="${v}" ${f.category===v?'selected':''}>${ico} ${CL[v]}</option>`).join('')}</select></div></div><div class="frow"><label>Título</label><input id="f-ti" class="inp" value="${(f.title||'').replace(/"/g,'&quot;')}"></div><div class="frow"><label>Descripción</label><textarea id="f-de" class="inp">${f.description||''}</textarea></div><div class="frow"><label>Evidencia</label><textarea id="f-ev" class="inp">${f.evidence||''}</textarea></div><div class="frow"><label>Recomendación</label><textarea id="f-re" class="inp">${f.recommendation||''}</textarea></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveF('${sid}','${fid}')">Actualizar</button>`);}
+function delF(sid,fid){confirmDlg('¿Eliminar este hallazgo?',async()=>{try{await A.delFinding(sid,fid);toast('Eliminado','success');viewSes(sid);}catch(e){toast(e.message,'error');}});}
+async function showReport(id){try{const d=await A.report(id),r=d.audit_report,s=r.session,sm=r.summary;showModal(`Informe — ${s.name}`,`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;padding:11px;background:var(--bg3);border-radius:8px;font-size:.8rem"><div><span style="color:var(--t2)">Empresa:</span> <strong>${s.company||'—'}</strong></div><div><span style="color:var(--t2)">Auditor:</span> <strong>${s.auditor||'—'}</strong></div><div><span style="color:var(--t2)">Fecha:</span> ${fd(s.created_at)}</div><div><span style="color:var(--t2)">Estado:</span> ${stb(s.status)}</div></div><div style="display:flex;gap:6px;margin-bottom:14px">${['critical','high','medium','low','info'].map(sv=>`<div style="flex:1;text-align:center;padding:8px;background:var(--bg3);border-radius:8px"><div class="sev-${sv}" style="font-size:1.2rem;font-weight:700;font-family:'Orbitron',monospace">${sm[sv]||0}</div><div style="font-size:.62rem;color:var(--t2);text-transform:uppercase">${sv}</div></div>`).join('')}</div>${['critical','high','medium','low','info'].map(sv=>{const fl=r.findings_by_severity[sv]||[];if(!fl.length)return '';return `<div style="margin-bottom:11px"><div class="sev-${sv}" style="font-weight:700;font-size:.72rem;text-transform:uppercase;margin-bottom:5px">${sv} (${fl.length})</div>${fl.map(f=>`<div style="padding:8px;background:var(--bg0);border-radius:6px;margin-bottom:4px;border-left:3px solid var(--${sv==='critical'?'r':sv==='high'?'o':sv==='medium'?'y':sv==='low'?'g':'c'})"><div style="font-weight:600;margin-bottom:2px">${f.title}</div><div style="color:var(--t2);font-size:.74rem;white-space:pre-wrap">${f.description||''}</div></div>`).join('')}</div>`;}).join('')}<div style="font-size:.68rem;color:var(--t2);text-align:right">Generado: ${fd(r.generated_at)}</div>`,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`,false);}catch(e){toast(e.message,'error');}}
+</script><script>
+// ======== INTERFACES ========
+async function interfaces(){
+  setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
+  let ifaces=[],ns=null;try{[ifaces,ns]=await Promise.all([A.ifaces(),A.netSt()]);}catch(e){toast(e.message,'error');}
+  const sug=(ns?.suggestions||[]).filter(s=>s.level!=='ok'),mon=ifaces.filter(i=>i.mode==='monitor'),mgd=ifaces.filter(i=>i.mode==='managed'&&i.is_up),down=ifaces.filter(i=>!i.is_up);
+  setC(`<div class="sup">
+    ${sug.map(s=>`<div class="alert ${s.level==='warning'?'aw':'ai'}" style="margin-bottom:8px">${ic(s.level==='warning'?'warn':'info')}<div>${s.message}</div></div>`).join('')}
+    ${ns?`<div style="background:var(--bg1);border:1px solid var(--b0);border-radius:var(--rl);padding:14px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div class="ctitle" style="margin-bottom:0">${ic('wifi')} Estado de Red</div><span class="badge ${ns.internet_available?'b-g':'b-r'}" style="margin-left:auto">${ns.internet_available?'Internet OK':'Sin Internet'}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+        ${[['Ethernet',ns.ethernet||[],'var(--c)'],['WiFi Managed',ns.wifi_managed||[],'var(--g)'],['WiFi Monitor',ns.wifi_monitor||[],'var(--y)']].map(([lbl,items,col])=>`<div><div class="net-col">${lbl}</div>${items.length?items.map(i=>`<div class="net-e"><div style="width:7px;height:7px;border-radius:50%;background:${i.state==='up'?col:'var(--t2)'};flex-shrink:0;${i.state==='up'?`box-shadow:0 0 5px ${col};`:''}"></div><span class="mono" style="font-size:.75rem">${i.interface}</span>${i.ipv4?`<span style="font-size:.72rem;color:var(--t2)">${i.ipv4}</span>`:''}<span class="badge ${i.state==='up'?'b-g':'b-x'}" style="margin-left:auto">${i.state}</span></div>`).join(''):`<div style="font-size:.74rem;color:var(--t2);padding:4px 0">—</div>`}</div>`).join('')}
+      </div>
+    </div>`:''}
+    ${mon.length?`<div class="iface-sec">${ic('wifi',12)} MONITOR MODE (${mon.length})</div><div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">${mon.map(ifCard).join('')}</div>`:''}
+    ${mgd.length?`<div class="iface-sec">${ic('wifi',12)} MANAGED MODE (${mgd.length})</div><div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">${mgd.map(ifCard).join('')}</div>`:''}
+    ${down.length?`<div class="iface-sec">DOWN (${down.length})</div><div style="display:flex;flex-direction:column;gap:10px">${down.map(ifCard).join('')}</div>`:''}
+    ${!ifaces.length?`<div class="empty">${ic('wifi',48)}<h3>Sin interfaces WiFi</h3></div>`:''}
+  </div>`);}
+function ifCard(i){const cl=!i.is_up?'iface-down':i.mode==='monitor'?'iface-mon':'iface-mgd';return `<div class="${cl}"><div class="iface-name">${i.name}</div><div class="iface-meta"><span>MAC: <strong class="mono">${i.mac||'—'}</strong></span><span>Driver: <strong>${i.driver||'—'}</strong></span><span>Chipset: <strong>${i.chipset||'—'}</strong></span><span>TX: <strong>${i.tx_power||'?'} dBm</strong></span>${i.phy?`<span>PHY: <strong>${i.phy}</strong></span>`:''}</div><div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">${i.supports_monitor?`<span class="badge b-g">Monitor ✓</span>`:''} ${i.supports_5ghz?`<span class="badge b-c">5GHz ✓</span>`:''} ${i.supports_inject?`<span class="badge b-p">Inject ✓</span>`:''}</div><div style="display:flex;gap:7px;flex-wrap:wrap">${i.mode==='managed'?`<button class="btn btn-g btn-sm" onclick="setMon('${i.name}')">→ Monitor</button>`:`<button class="btn btn-gh btn-sm" onclick="setMgd('${i.name}')">→ Managed</button>`}<button class="btn btn-gh btn-sm" onclick="spoofUI('${i.name}')">Spoof MAC</button><button class="btn btn-gh btn-sm" onclick="txUI('${i.name}',${i.tx_power||20})">TX Power</button></div></div>`;}
+async function setMon(n){try{const r=await A.setMon(n);toast(r.success?`${n} → monitor (${r.monitor_interface})`:'Error',r.success?'success':'error');interfaces();}catch(e){toast(e.message,'error');}}
+async function setMgd(n){try{await A.setMgd(n);toast(`${n} → managed`,'success');interfaces();}catch(e){toast(e.message,'error');}}
+function spoofUI(n){showModal(`Spoof MAC — ${n}`,`<div class="alert aw">${ic('warn')}<div>Puede interrumpir la conexión.</div></div><div class="frow"><label>Nueva MAC (vacío=aleatoria)</label><input id="sm-mac" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="doSpoof('${n}')">Aplicar</button>`);}
+async function doSpoof(n){const m=document.getElementById('sm-mac')?.value?.trim();try{const r=await A.spoofMac(n,m||null);closeModal();toast(`Nueva MAC: ${r.new_mac}`,'success');interfaces();}catch(e){toast(e.message,'error');}}
+function txUI(n,c){showModal(`TX Power — ${n}`,`<div class="frow"><label>Potencia dBm (1–30)</label><input id="tx-v" class="inp" type="number" min="1" max="30" value="${c}"></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="doTx('${n}')">Aplicar</button>`);}
+async function doTx(n){const p=parseInt(document.getElementById('tx-v')?.value);try{const r=await A.setTx(n,p);closeModal();toast(`TX → ${r.tx_power} dBm`,'success');interfaces();}catch(e){toast(e.message,'error');}}
+// ======== WIFI SCAN ========
+let _scan=null,_scanPoll=null;
+async function wifiscan(){
+  let ifaces=[];try{ifaces=await A.ifaces();}catch{}
+  setC(`<div class="sup"><div class="g2" style="margin-bottom:16px"><div class="card" id="ws-form" data-pp="ws-form">
+    <div class="ctitle">${ic('search')} Nueva Exploración</div>
+    ${!ifaces.filter(i=>i.mode==='monitor').length?`<div class="alert aw" style="margin-bottom:10px">${ic('warn')}<div>Sin interfaces en monitor. <button class="btn btn-gh btn-xs" onclick="goto('interfaces')">Ir a Interfaces →</button></div></div>`:''}
+    <div class="fgrid">
+      <div class="frow"><label>Interfaz</label><select id="ws-if" class="inp" data-p>${ifaces.map(i=>`<option value="${i.name}" ${i.mode==='monitor'?'selected':''}>${i.name} (${i.mode})</option>`).join('')}</select></div>
+      <div class="frow"><label>Banda</label><select id="ws-band" class="inp" data-p><option value="bg">2.4 GHz (b/g/n)</option><option value="a">5 GHz (a/n/ac)</option><option value="abg">Dual Band</option></select></div>
+      <div class="frow"><label>Duración (seg)</label><input id="ws-dur" class="inp" type="number" value="30" min="10" max="300" data-p></div>
+      <div class="frow"><label>Canal (opcional)</label><input id="ws-ch" class="inp" type="number" placeholder="Todos" data-p></div>
+    </div>
+    <div class="fgrid">
+      <div class="frow"><label>BSSID objetivo</label><input id="ws-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF" data-p></div>
+      <div class="frow"><label>ESSID objetivo</label><input id="ws-essid" class="inp" placeholder="Nombre de red" data-p></div>
+    </div>
+    <button class="btn btn-g" style="width:100%" id="ws-btn" onclick="startScan()">${ic('play')} Iniciar Escaneo</button>
+  </div>
+  <div class="card" id="ws-status-card">
+    <div class="ctitle">${ic('refresh')} Estado</div>
+    <div id="ws-empty" class="empty" style="padding:22px">${ic('search',36)}<h3>Sin escaneo activo</h3></div>
+    <div id="ws-live" style="display:none"></div>
+  </div></div>
+  <div id="ws-results"></div>
+  <div id="ws-history"><div style="font-family:'Orbitron',monospace;font-size:.68rem;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">${ic('folder',12)} Escaneos Anteriores</div><div id="ws-hist-list"><div style="color:var(--t2);font-size:.78rem">Cargando...</div></div></div>
+  </div>`);
+  restFP('ws-form');
+  if(ST.lastScan)renderScanR(ST.lastScan);
+  loadScHist();}
+async function loadScHist(){try{const sc=await A.listScans();const el=document.getElementById('ws-hist-list');if(!el)return;if(!sc.length){el.innerHTML=`<div style="color:var(--t2);font-size:.78rem">Sin escaneos previos</div>`;return;}el.innerHTML=`<div class="twrap"><table><thead><tr><th>ID</th><th>Iface</th><th>Banda</th><th>APs</th><th>Estado</th><th>Inicio</th><th></th></tr></thead><tbody>${sc.slice(0,10).map(s=>`<tr><td class="mono" style="font-size:.7rem">${s.id}</td><td class="mono" style="font-size:.72rem">${s.interface||'—'}</td><td><span class="badge b-c">${s.band||'—'}</span></td><td><strong>${s.access_points?.length||0}</strong></td><td>${stb(s.status)}</td><td class="mono" style="font-size:.68rem;color:var(--t2)">${fd(s.started_at)}</td><td><button class="btn btn-gh btn-xs" onclick="loadScanR('${s.id}')">Ver</button></td></tr>`).join('')}</tbody></table></div>`;}catch{}}
+async function startScan(){const iface=document.getElementById('ws-if')?.value,band=document.getElementById('ws-band')?.value||'bg',dur=parseInt(document.getElementById('ws-dur')?.value)||30,ch=document.getElementById('ws-ch')?.value,bssid=document.getElementById('ws-bssid')?.value?.trim(),essid=document.getElementById('ws-essid')?.value?.trim();if(!iface){toast('Selecciona interfaz','warn');return;}try{document.getElementById('ws-btn').disabled=true;const sc=await A.startScan({interface:iface,band,duration:dur,channel:ch?parseInt(ch):null,target_bssid:bssid||null,target_essid:essid||null});_scan=sc;toast('Escaneo iniciado','success');startScanPoll(sc.id,dur);}catch(e){toast(e.message,'error');const b=document.getElementById('ws-btn');if(b)b.disabled=false;}}
+function startScanPoll(id,dur){let el=0;if(_scanPoll)clearInterval(_scanPoll);updateScanSt(null,0,dur,'running');_scanPoll=setInterval(async()=>{el=Math.min(el+2,dur);try{const sc=await A.getScan(id);_scan=sc;updateScanSt(sc,el,dur,sc.status);if(sc.status!=='running'){clearInterval(_scanPoll);_scanPoll=null;ST.lastScan=sc;localStorage.setItem('lastScan',JSON.stringify(sc));renderScanR(sc);loadScHist();const b=document.getElementById('ws-btn');if(b)b.disabled=false;}}catch{}},2000);}
+function updateScanSt(sc,el,tot,st){const live=document.getElementById('ws-live'),empty=document.getElementById('ws-empty');if(!live)return;if(empty)empty.style.display='none';live.style.display='block';const p=tot?Math.round(el/tot*100):0;live.innerHTML=`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:.78rem;color:var(--t1)">${st==='running'?'🔄 Escaneando...':st==='completed'?'✅ Completado':'❌ '+st}</span><span class="mono" style="font-size:.75rem;color:var(--t2)">${el}s/${tot}s</span></div><div class="ptrack"><div class="pbar" style="width:${p}%"></div></div></div>${sc?`<div style="display:flex;gap:14px"><div><div style="color:var(--t2);font-size:.62rem;text-transform:uppercase">APs</div><div style="font-size:1.1rem;font-weight:700;color:var(--g);font-family:'Orbitron',monospace">${sc.access_points?.length||0}</div></div><div><div style="color:var(--t2);font-size:.62rem;text-transform:uppercase">Clientes</div><div style="font-size:1.1rem;font-weight:700;color:var(--c);font-family:'Orbitron',monospace">${sc.client_count||0}</div></div></div>`:''} ${st==='running'?`<button class="btn btn-d btn-sm" style="width:100%;margin-top:10px" onclick="stopScan()">Detener</button>`:''}`;}async function stopScan(){if(_scan)try{await A.stopScan(_scan.id);toast('Detenido','success');}catch(e){toast(e.message,'error');}}
+async function loadScanR(id){try{const sc=await A.getScan(id);ST.lastScan=sc;localStorage.setItem('lastScan',JSON.stringify(sc));renderScanR(sc);}catch(e){toast(e.message,'error');}}
+function renderScanR(scan){
+  const el=document.getElementById('ws-results');if(!el)return;
+  const aps=scan.access_points||[],cli=scan.clients||[],sorted=[...aps].sort((a,b)=>b.power-a.power);
+  el.innerHTML=`<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div class="ctitle" style="margin-bottom:0">${ic('wifi')} APs (${aps.length})</div><div style="display:flex;gap:6px"><span class="badge b-c">${scan.band}</span>${stb(scan.status)}</div></div>
+  ${!aps.length?`<div class="empty" style="padding:24px">${ic('wifi',32)}<h3>Sin APs</h3></div>`:`<div class="twrap"><table><thead><tr><th>ESSID</th><th>BSSID</th><th>Señal</th><th>CH</th><th>Seguridad</th><th>Fab.</th><th>Cli</th><th>Acciones</th></tr></thead><tbody>
+  ${sorted.map(ap=>`<tr><td><div style="display:flex;align-items:center;gap:5px"><strong>${ap.essid||'<oculto>'}</strong>${ap.is_hidden?`<span class="badge b-x" style="font-size:.56rem">OCU</span>`:''}</div></td><td class="mono" style="font-size:.7rem;color:var(--t2)">${ap.bssid}</td><td><div style="display:flex;align-items:center;gap:4px">${sigb(ap.power)}<span class="mono" style="font-size:.66rem;color:var(--t2)">${ap.power}</span></div></td><td class="mono" style="font-weight:600">${ap.channel||'—'}</td><td>${sbadge(ap.security||'?')} ${ap.wps?`<span class="badge b-y" style="font-size:.56rem">WPS</span>`:''}</td><td style="font-size:.7rem;color:var(--t2);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ap.manufacturer||'—'}</td><td style="font-weight:700;color:${(ap.clients?.length||0)>0?'var(--c)':'var(--t2)'}">${ap.clients?.length||0}</td><td><div style="display:flex;gap:3px"><button class="btn btn-gh btn-xs" title="Handshake" onclick="goHS('${ap.bssid}','${(ap.essid||'').replace(/'/g,"\\'")}',${ap.channel||6})">${ic('key',11)} HS</button><button class="btn btn-gh btn-xs" onclick="showOUI('${ap.bssid}')">OUI</button>${ST.activeSession?`<button class="btn btn-gh btn-xs" onclick="qkF('${ap.bssid}','${(ap.essid||'').replace(/'/g,"\\'")}','${ap.security||'?'}')">${ic('plus',11)}</button>`:''}</div></td></tr>`).join('')}
+  </tbody></table></div>`}
+  </div>
+  ${cli.length?`<div class="card" style="margin-bottom:16px"><div class="ctitle">${ic('wifi')} Clientes (${cli.length})</div><div class="twrap"><table><thead><tr><th>MAC</th><th>Señal</th><th>AP</th><th>Fabricante</th><th>Probes</th></tr></thead><tbody>${cli.map(c=>`<tr><td class="mono" style="font-size:.76rem">${c.mac}</td><td><div style="display:flex;align-items:center;gap:4px">${sigb(c.power)}<span class="mono" style="font-size:.66rem;color:var(--t2)">${c.power}</span></div></td><td class="mono" style="font-size:.7rem;color:${c.bssid?'var(--c)':'var(--t2)'}">${c.bssid||'No asoc.'}</td><td style="font-size:.7rem;color:var(--t2)">${c.manufacturer||'—'}</td><td style="font-size:.66rem">${(c.probes||[]).slice(0,3).map(p=>`<span class="kbd">${p}</span>`).join(' ')||'—'}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
+}
+function goHS(bssid,essid,ch){if(!FP['hs-form'])FP['hs-form']={};FP['hs-form']['hs-bssid']=bssid;FP['hs-form']['hs-essid']=essid;FP['hs-form']['hs-ch']=ch;localStorage.setItem('FP',JSON.stringify(FP));goto('handshake');}
+function qkF(bssid,essid,sec){if(!ST.activeSession){toast('Activa una sesión','warn');return;}const sv=sec==='OPEN'?'critical':sec==='WEP'?'high':sec==='WPA'?'medium':'low';showModal('Hallazgo Rápido',`<div class="alert ai">${ic('info')}<div>Pre-rellenado para <strong>${essid||bssid}</strong> (${sec})</div></div><div class="fgrid"><div class="frow"><label>Severidad</label><select id="f-sv" class="inp">${['critical','high','medium','low','info'].map(s=>`<option value="${s}" ${s===sv?'selected':''}>${s}</option>`).join('')}</select></div><div class="frow"><label>Categoría</label><select id="f-ca" class="inp">${Object.entries(CI).map(([v,ico])=>`<option value="${v}" ${v==='wifi'?'selected':''}>${ico} ${CL[v]}</option>`).join('')}</select></div></div><div class="frow"><label>Título</label><input id="f-ti" class="inp" value="${sec==='OPEN'?'Red WiFi sin cifrado (OPEN)':sec==='WEP'?'Cifrado WEP obsoleto':sec==='WPA'?'WPA v1 obsoleto':'Seguridad WiFi — '+(essid||bssid)}"></div><div class="frow"><label>Descripción</label><textarea id="f-de" class="inp">${sec==='OPEN'?'La red "'+essid+'" ('+bssid+') opera sin cifrado. El tráfico puede ser interceptado.':'Red "'+essid+'" ('+bssid+') usa '+sec+'.'}</textarea></div><div class="frow"><label>Evidencia</label><textarea id="f-ev" class="inp">BSSID: ${bssid}\nESSID: ${essid||'oculto'}\nSeguridad: ${sec}</textarea></div><div class="frow"><label>Recomendación</label><textarea id="f-re" class="inp">${sec==='OPEN'?'Configurar WPA3-SAE o WPA2-PSK con contraseña de mínimo 16 caracteres.':sec==='WEP'?'Migrar a WPA2/WPA3 inmediatamente.':'Actualizar a WPA3-SAE si el hardware lo soporta.'}</textarea></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-g" onclick="saveF('${ST.activeSession.id}')">Guardar</button>`);}
+async function showOUI(mac){try{const r=await A.oui(mac);showModal('OUI / Fabricante',`<div style="padding:13px;background:var(--bg0);border-radius:8px;border:1px solid var(--b1);margin-bottom:10px"><div class="mono" style="font-size:1rem;color:var(--c);margin-bottom:7px">${r.mac}</div><div style="font-size:.84rem;margin-bottom:5px"><span style="color:var(--t2)">Fabricante:</span> <strong>${r.manufacturer||'Desconocido'}</strong></div><div style="font-size:.8rem"><span style="color:var(--t2)">OUI:</span> <span class="mono">${r.oui||'—'}</span></div></div>${r.is_randomized?`<div class="alert aw">${ic('warn')}<div>MAC aleatorizada (privacidad)</div></div>`:`<span class="badge b-g">✓ MAC estática</span>`}`,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`);}catch(e){toast(e.message,'error');}}
+// ======== RECON ========
+async function recon(){
+  setC(`<div class="sup"><div class="g2" style="margin-bottom:16px"><div class="card" id="rec-form" data-pp="rec-form">
+    <div class="ctitle">${ic('search')} Escaneo nmap</div>
+    <div class="frow"><label>Objetivo *</label><input id="rec-tgt" class="inp" placeholder="192.168.0.0/24" data-p></div>
+    <div class="frow"><label>Tipo</label><select id="rec-type" class="inp" data-p>
+      <option value="quick">Quick — Ping sweep</option><option value="full">Full — Todos puertos + OS</option>
+      <option value="service">Service — Versiones</option><option value="vuln">Vuln — NSE vulnerabilidades</option>
+      <option value="os_detect">OS Detect — Fingerprinting</option><option value="stealth">Stealth — SYN scan</option>
+      <option value="udp">UDP — Top 100</option>
+    </select></div>
+    <div class="frow"><label>Puertos (opcional)</label><input id="rec-ports" class="inp" placeholder="22,80,443" data-p></div>
+    <button class="btn btn-g" style="width:100%" id="rec-btn" onclick="startRecon()">${ic('play')} Iniciar</button>
+  </div>
+  <div class="card" id="rec-st-card">
+    <div class="ctitle">${ic('search')} Estado</div>
+    <div id="rec-empty" class="empty" style="padding:22px">${ic('search',36)}<h3>Sin escaneo activo</h3></div>
+    <div id="rec-live" style="display:none"></div>
+  </div></div>
+  <div id="rec-results"></div><div id="rec-hist"></div></div>`);
+  restFP('rec-form');loadRecHist();}
+async function loadRecHist(){try{const sc=await A.listRecon();const el=document.getElementById('rec-hist');if(!el||!sc.length)return;el.innerHTML=`<div style="font-family:'Orbitron',monospace;font-size:.68rem;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">Escaneos Anteriores</div><div class="twrap"><table><thead><tr><th>Objetivo</th><th>Tipo</th><th>Comando</th><th>Hosts</th><th>Estado</th><th>Fecha</th><th></th></tr></thead><tbody>${sc.slice(0,8).map(s=>`<tr><td class="mono">${s.target}</td><td><span class="badge b-c">${s.scan_type}</span></td><td class="mono" style="font-size:.64rem;color:var(--t2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.command||''}">${s.command||'—'}</td><td><strong>${s.hosts?.length||0}</strong></td><td>${stb(s.status)}</td><td class="mono" style="font-size:.68rem;color:var(--t2)">${fd(s.started_at)}</td><td><button class="btn btn-gh btn-xs" onclick="loadRecR('${s.id}')">Ver</button></td></tr>`).join('')}</tbody></table></div>`;}catch{}}
+async function startRecon(){const t=document.getElementById('rec-tgt')?.value?.trim(),tp=document.getElementById('rec-type')?.value,p=document.getElementById('rec-ports')?.value?.trim();if(!t){toast('Introduce objetivo','warn');return;}const btn=document.getElementById('rec-btn');if(btn)btn.disabled=true;const live=document.getElementById('rec-live'),empty=document.getElementById('rec-empty');if(empty)empty.style.display='none';if(live){live.style.display='block';live.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> nmap <strong>${tp}</strong> en <span class="mono">${t}</span>...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;}try{const r=await A.startRecon({target:t,scan_type:tp,ports:p||null,timeout:600});if(live)live.innerHTML=`<div class="alert as">${ic('check')}<div>Completado · ${r.hosts?.length||0} hosts</div></div>${r.command?`<div style="font-size:.7rem;color:var(--t2);margin-top:7px">${ic('terminal',11)} Comando:<div class="mono" style="color:var(--c);font-size:.67rem;margin-top:3px;padding:5px;background:var(--bg0);border-radius:4px;word-break:break-all">${r.command}</div></div>`:''}`;renderRecR(r);loadRecHist();}catch(e){toast(e.message,'error');if(live)live.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}if(btn)btn.disabled=false;}
+async function loadRecR(id){try{const r=await A.getRecon(id);renderRecR(r);}catch(e){toast(e.message,'error');}}
+function renderRecR(scan){
+  const el=document.getElementById('rec-results');if(!el)return;const hosts=scan.hosts||[];
+  el.innerHTML=`<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div class="ctitle" style="margin-bottom:0">${ic('search')} Hosts (${hosts.length}) · <span class="badge b-c">${scan.scan_type}</span></div>${scan.command?`<div class="mono" style="font-size:.64rem;color:var(--t2);max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${scan.command}">${ic('terminal',11)} ${scan.command}</div>`:''}</div>
+  ${!hosts.length?`<div class="empty" style="padding:22px">${ic('search',30)}<h3>Sin hosts</h3></div>`:hosts.map(h=>`<div class="hitem" id="hi-${h.ip.replace(/\./g,'_')}"><div class="hhdr" onclick="togHD('${h.ip}')"><span style="font-family:'JetBrains Mono',monospace;font-size:.9rem;color:var(--c);font-weight:600">${h.ip}</span>${h.hostname?`<span style="font-size:.76rem;color:var(--t2)">${h.hostname}</span>`:''} ${h.mac?`<span class="mono" style="font-size:.7rem;color:var(--t2)">${h.mac}</span>`:''} <span class="badge ${h.state==='up'?'b-g':'b-x'}">${h.state}</span> ${h.os_guess?`<span class="badge b-p">${h.os_guess}</span>`:''} ${h.ports?.length?`<span class="badge b-c">${h.ports.filter(p=>p.state==='open').length} open</span>`:''}<div style="margin-left:auto;display:flex;gap:5px"><button class="btn btn-gh btn-xs" onclick="event.stopPropagation();hScan('${h.ip}','service')" title="Deep scan">${ic('search',11)} Deep</button><button class="btn btn-d btn-xs" onclick="event.stopPropagation();hScan('${h.ip}','vuln')" title="Vuln scan">${ic('warn',11)} Vuln</button></div></div><div class="hdetail" id="hd-${h.ip.replace(/\./g,'_')}" style="display:none">${h.ports?.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">${h.ports.map(p=>`<span class="badge ${p.state==='open'?'b-g':'b-x'}" title="${p.service||''}">${p.port}/${p.protocol}</span>`).join('')}</div>`:''} ${h.services?.length?`<div style="margin-bottom:7px">${h.services.map(s=>`<div style="font-size:.72rem;color:var(--t2);margin-bottom:2px"><span class="mono" style="color:var(--g)">${s.port}</span> <strong>${s.name}</strong> ${s.product||''} ${s.version||''}</div>`).join('')}</div>`:''} ${h.scripts?.length?h.scripts.map(s=>`<div style="margin-bottom:6px;padding:7px;background:var(--bg0);border-radius:5px;border-left:2px solid var(--y)"><div style="font-size:.66rem;font-weight:700;color:var(--y);margin-bottom:3px">${ic('warn',10)} ${s.id}</div><pre style="font-size:.64rem;color:var(--t2);white-space:pre-wrap;max-height:200px;overflow-y:auto;line-height:1.4">${s.output}</pre></div>`).join(''):''}  <div id="hs-res-${h.ip.replace(/\./g,'_')}"></div></div></div>`).join('')}
+  </div>`;}
+function togHD(ip){const k=ip.replace(/\./g,'_'),el=document.getElementById(`hd-${k}`);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+async function hScan(ip,type){const k=ip.replace(/\./g,'_'),hd=document.getElementById(`hd-${k}`),res=document.getElementById(`hs-res-${k}`);if(hd)hd.style.display='block';if(res)res.innerHTML=`<div style="display:flex;align-items:center;gap:7px;margin-top:10px;color:var(--y)"><div class="spin"></div> ${type} en ${ip}...</div><div class="ptrack" style="margin-top:5px"><div class="pbar ind"></div></div>`;try{const r=await A.startRecon({target:ip,scan_type:type,timeout:300}),h=r.hosts?.find(x=>x.ip===ip)||r.hosts?.[0];if(res)res.innerHTML=`<div style="margin-top:10px"><div style="font-size:.66rem;color:var(--t2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em">Resultado ${type} · ${fd(new Date().toISOString())}</div>${r.command?`<div class="mono" style="font-size:.64rem;color:var(--c);padding:4px 6px;background:var(--bg0);border-radius:4px;margin-bottom:7px;word-break:break-all">${ic('terminal',10)} ${r.command}</div>`:''} ${h?`${h.os_guess?`<div style="margin-bottom:5px"><span class="badge b-p">OS: ${h.os_guess}</span></div>`:''} ${(h.ports||[]).filter(p=>p.state==='open').length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${h.ports.filter(p=>p.state==='open').map(p=>`<span class="badge b-g" title="${p.service||''} ${p.version||''}">${p.port}/${p.protocol}</span>`).join('')}</div>`:''} ${(h.services||[]).length?`<div style="margin-bottom:6px">${h.services.map(s=>`<div style="font-size:.7rem;color:var(--t1);margin-bottom:2px"><span class="mono" style="color:var(--g)">${s.port}</span> <strong>${s.name}</strong> ${s.product||''} ${s.version||''}</div>`).join('')}</div>`:''} ${(h.scripts||[]).length?h.scripts.map(s=>`<div style="margin-bottom:7px;padding:7px;background:var(--bg0);border-radius:5px;border-left:3px solid var(--y)"><div style="font-size:.66rem;font-weight:700;color:var(--y);margin-bottom:3px">${ic('warn',10)} ${s.id}</div><pre style="font-size:.63rem;color:var(--t2);white-space:pre-wrap;max-height:200px;overflow-y:auto;line-height:1.4">${s.output}</pre></div>`).join(''):''}`:''}</div>`;toast(`${type} OK para ${ip}`,'success');}catch(e){toast(e.message,'error');if(res)res.innerHTML=`<div class="alert ae" style="margin-top:8px">${ic('x')}<div>${e.message}</div></div>`;}}
+</script><script>
+// ======== HANDSHAKE / CRACK ========
+let _hsTimer=null;
+async function handshake(){
+  let ifaces=[],caps=[],wls=[];
+  try{[ifaces,caps,wls]=await Promise.all([A.ifaces(),A.caps(),A.wls()]);}catch{}
+  const capArr=Array.isArray(caps)?caps:[];const wlArr=wls?.wordlists||[];
+  setC(`<div class="sup"><div class="tabs" id="hs-tabs"><div class="tab active" onclick="swTab('hs-tabs','hs-tc',0)">Captura + Deauth</div><div class="tab" onclick="swTab('hs-tabs','hs-tc',1)">Crack</div></div>
+  <div class="tc active" id="hs-tc-0"><div class="g2">
+    <div class="card" id="hs-form" data-pp="hs-form">
+      <div class="ctitle">${ic('key')} Captura de Handshake</div>
+      <div class="fgrid"><div class="frow"><label>Interfaz</label><select id="hs-if" class="inp" data-p>${ifaces.map(i=>`<option value="${i.name}">${i.name} (${i.mode})</option>`).join('')}</select></div><div class="frow"><label>Canal</label><input id="hs-ch" class="inp" type="number" value="6" data-p></div></div>
+      <div class="frow"><label>BSSID objetivo *</label><input id="hs-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF" data-p></div>
+      <div class="frow"><label>ESSID (opcional)</label><input id="hs-essid" class="inp" placeholder="Nombre de la red" data-p></div>
+      <div class="fgrid"><div class="frow"><label>Timeout (seg)</label><input id="hs-to" class="inp" type="number" value="120" data-p></div><div class="frow"><label>Paquetes deauth</label><input id="hs-dp" class="inp" type="number" value="10" data-p></div></div>
+      <div class="crow"><input type="checkbox" id="hs-da" checked data-p><label for="hs-da">Enviar deauth antes de capturar</label></div>
+      <div style="border:1px solid var(--b0);border-radius:8px;padding:12px;margin:12px 0;background:var(--bg3)">
+        <div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px">${ic('stop',11)} Deauth Manual</div>
+        <div class="alert aw" style="margin-bottom:9px">${ic('warn')}<div style="font-size:.74rem">Solo en redes propias o con permiso escrito.</div></div>
+        <div class="fgrid"><div class="frow"><label>Interfaz</label><select id="da-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>BSSID</label><input id="da-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div></div>
+        <div class="fgrid"><div class="frow"><label>MAC cliente (vacío=broadcast)</label><input id="da-cli" class="inp" placeholder="FF:FF:FF:FF:FF:FF"></div><div class="frow"><label>Paquetes</label><input id="da-pkts" class="inp" type="number" value="50"></div></div>
+        <button class="btn btn-d btn-sm" style="width:100%" onclick="sendDeauth()">${ic('stop')} Enviar Deauth</button>
+      </div>
+      <button class="btn btn-g" style="width:100%" id="hs-btn" onclick="startHS()">${ic('play')} Capturar Handshake</button>
+    </div>
+    <div class="card">
+      <div class="ctitle">${ic('key')} Resultado</div>
+      <div id="hs-cdown" style="display:none"></div>
+      <div id="hs-res-empty" class="empty" style="padding:24px">${ic('key',36)}<h3>Sin resultado</h3><p>Inicia una captura</p></div>
+      <div id="hs-res" style="display:none"></div>
+    </div>
+  </div></div>
+  <div class="tc" id="hs-tc-1"><div class="g2">
+    <div class="card" id="cr-form" data-pp="cr-form">
+      <div class="ctitle">${ic('zap')} Crack de Handshake</div>
+      <div class="frow"><label>Archivo de captura</label>
+        <select id="cr-file" class="inp" data-p><option value="">— Selecciona —</option>${capArr.map(c=>`<option value="${c.filepath}">${c.filename}${c.target_essid?' ('+c.target_essid+')':''}${c.has_handshake?' ✓HS':''}</option>`).join('')}</select>
+        <button class="btn btn-gh btn-xs" style="margin-top:4px" onclick="reloadCrF()">Recargar archivos</button>
+      </div>
+      <div class="frow"><label>BSSID objetivo *</label><input id="cr-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF" data-p></div>
+      <div class="frow"><label>Wordlist</label><select id="cr-wl" class="inp" data-p><option value="rockyou.txt">rockyou.txt (clásico)</option>${wlArr.map(w=>`<option value="${w.filename}">${w.filename} (${(w.lines||0).toLocaleString()} líneas)</option>`).join('')}<option value="__custom">Ruta personalizada...</option></select></div>
+      <div id="cr-cust-wrap" style="display:none" class="frow"><label>Ruta personalizada</label><input id="cr-cust" class="inp" placeholder="/data/wordlists/custom.txt"></div>
+      <button class="btn btn-g" style="width:100%;margin-top:6px" id="cr-btn" onclick="startCrack()">${ic('zap')} Iniciar Crack</button>
+    </div>
+    <div class="card"><div class="ctitle">${ic('zap')} Resultado</div><div id="cr-res" class="empty" style="padding:24px">${ic('zap',36)}<h3>Sin resultado</h3></div></div>
+  </div></div>
+  </div>`);
+  restFP('hs-form');restFP('cr-form');
+  document.getElementById('cr-wl')?.addEventListener('change',function(){document.getElementById('cr-cust-wrap').style.display=this.value==='__custom'?'block':'none';});}
+async function reloadCrF(){try{const caps=await A.caps();const sel=document.getElementById('cr-file');if(!sel)return;const cur=sel.value;const arr=Array.isArray(caps)?caps:[];sel.innerHTML=`<option value="">— Selecciona —</option>`+arr.map(c=>`<option value="${c.filepath}" ${c.filepath===cur?'selected':''}>${c.filename}${c.target_essid?' ('+c.target_essid+')':''}${c.has_handshake?' ✓HS':''}</option>`).join('');toast('Recargado','success');}catch(e){toast(e.message,'error');}}
+async function startHS(){
+  const iface=document.getElementById('hs-if')?.value,bssid=document.getElementById('hs-bssid')?.value?.trim(),essid=document.getElementById('hs-essid')?.value?.trim(),ch=parseInt(document.getElementById('hs-ch')?.value)||6,to=parseInt(document.getElementById('hs-to')?.value)||120,da=document.getElementById('hs-da')?.checked,dp=parseInt(document.getElementById('hs-dp')?.value)||10;
+  if(!bssid){toast('BSSID obligatorio','warn');return;}
+  const btn=document.getElementById('hs-btn');if(btn)btn.disabled=true;
+  const empty=document.getElementById('hs-res-empty'),res=document.getElementById('hs-res'),cdown=document.getElementById('hs-cdown');
+  if(empty)empty.style.display='none';if(res)res.style.display='none';
+  if(cdown){cdown.style.display='block';let rem=to;if(_hsTimer)clearInterval(_hsTimer);_hsTimer=setInterval(()=>{rem--;const cl=rem<10?'low':rem<30?'':'';cdown.innerHTML=`<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--t2);text-align:center;margin-bottom:4px">Capturando — <strong>${bssid}</strong></div><div class="cdown ${cl}">${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}</div><div style="font-size:.66rem;color:var(--t2);text-align:center;margin-top:2px">segundos restantes</div><div class="ptrack" style="margin-top:8px"><div class="pbar" style="width:${Math.round((1-rem/to)*100)}%"></div></div></div>`;if(rem<=0)clearInterval(_hsTimer);},1000);cdown.innerHTML=`<div class="cdown">${String(Math.floor(to/60)).padStart(2,'0')}:${String(to%60).padStart(2,'0')}</div>`;}
+  try{const r=await A.captureHS({interface:iface,target_bssid:bssid,target_essid:essid||null,channel:ch,timeout:to,deauth_first:da,deauth_packets:dp,band:'bg',session_id:ST.activeSession?.id||undefined});
+  clearInterval(_hsTimer);if(cdown)cdown.style.display='none';
+  if(res){res.style.display='block';res.innerHTML=`<div class="${r.handshake_captured?'alert as':'alert aw'}" style="margin-bottom:12px">${r.handshake_captured?ic('check'):ic('x')}<div><strong>${r.handshake_captured?'¡Handshake capturado!':'Sin handshake'}</strong></div></div>${r.capture_file?`<div style="margin-bottom:8px;font-size:.76rem"><span style="color:var(--t2)">Archivo:</span> <span class="mono" style="color:var(--g)">${r.capture_file}</span></div>`:''}<div style="font-size:.75rem;color:var(--t2)">Duración: ${r.duration_seconds}s · Deauth: ${r.deauth_sent?'Sí':'No'}</div>${r.handshake_captured?`<button class="btn btn-gh btn-sm" style="margin-top:10px" onclick="swTab('hs-tabs','hs-tc',1);setTimeout(()=>{const s=document.getElementById('cr-file');if(s)s.value='${r.capture_file}';const b=document.getElementById('cr-bssid');if(b)b.value='${bssid}';},80)">Ir a Crack →</button>`:''}`;}  toast(r.handshake_captured?'¡Handshake!':'Sin handshake',r.handshake_captured?'success':'warn');}
+  catch(e){clearInterval(_hsTimer);if(cdown)cdown.style.display='none';toast(e.message,'error');if(res){res.style.display='block';res.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}}
+  if(btn)btn.disabled=false;}
+async function startCrack(){const file=document.getElementById('cr-file')?.value,bssid=document.getElementById('cr-bssid')?.value?.trim(),wl=document.getElementById('cr-wl')?.value,cust=document.getElementById('cr-cust')?.value?.trim();if(!file||!bssid){toast('Archivo y BSSID obligatorios','warn');return;}const btn=document.getElementById('cr-btn');if(btn)btn.disabled=true;const el=document.getElementById('cr-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Crackeando...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;try{const r=await A.crack({capture_file:file,target_bssid:bssid,wordlist:wl==='__custom'?null:wl,custom_wordlist_path:wl==='__custom'?cust:null});if(el)el.innerHTML=`<div class="${r.success?'alert as':'alert aw'}" style="margin-bottom:12px">${r.success?ic('check'):ic('x')}<div><strong>${r.success?'¡Contraseña encontrada!':'Sin resultado'}</strong></div></div>${r.success?`<div style="padding:14px;background:var(--bg0);border-radius:8px;border:1px solid var(--g);text-align:center;margin-bottom:12px"><div style="font-size:.62rem;color:var(--t2);margin-bottom:4px;letter-spacing:.1em">PASSPHRASE</div><div style="font-family:'Orbitron',monospace;font-size:1.2rem;color:var(--g);word-break:break-all">${r.key}</div></div>`:''}<div style="font-size:.74rem;color:var(--t2)">Duración: ${r.duration_seconds}s · Claves: ${(r.keys_tried||0).toLocaleString()}</div>`;toast(r.success?`Pass: ${r.key}`:'Sin resultado',r.success?'success':'info');}catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}if(btn)btn.disabled=false;}
+async function sendDeauth(){const iface=document.getElementById('da-if')?.value,bssid=(document.getElementById('da-bssid')?.value||document.getElementById('hs-bssid')?.value||'').trim(),cli=document.getElementById('da-cli')?.value?.trim(),pkts=parseInt(document.getElementById('da-pkts')?.value)||50;if(!bssid){toast('BSSID obligatorio','warn');return;}try{const r=await A.deauth({interface:iface,target_bssid:bssid,client_mac:cli||null,packets:pkts,reason:'Manual deauth'});toast(`Deauth: ${r.packets_sent} paquetes → ${r.target}`,'success');}catch(e){toast(e.message,'error');}}
+// ======== ADVANCED ========
+async function advanced(){
+  let ifaces=[],wls=[],caps=[];try{[ifaces,wls,caps]=await Promise.all([A.ifaces(),A.wls(),A.caps()]);}catch{}
+  const wlArr=wls?.wordlists||[],capArr=Array.isArray(caps)?caps:[];
+  setC(`<div class="sup"><div class="tabs" id="adv-tabs"><div class="tab active" onclick="swTab('adv-tabs','adv-tc',0)">PMKID</div><div class="tab" onclick="swTab('adv-tabs','adv-tc',1)">AP-Less</div><div class="tab" onclick="swTab('adv-tabs','adv-tc',2)">Enterprise</div><div class="tab" onclick="swTab('adv-tabs','adv-tc',3)">WPA3</div></div>
+  <div class="tc active" id="adv-tc-0">${pmkT(ifaces,wlArr)}</div>
+  <div class="tc" id="adv-tc-1">${aplT(ifaces,wlArr,capArr)}</div>
+  <div class="tc" id="adv-tc-2">${entT(ifaces)}</div>
+  <div class="tc" id="adv-tc-3">${w3T(ifaces)}</div></div>`);}
+function pmkT(ifaces,wls){return `<div class="g2"><div class="card"><div class="ctitle">${ic('key')} Captura PMKID</div><div class="alert ai" style="margin-bottom:10px">${ic('info')}<div>No requiere cliente conectado.</div></div><div class="frow"><label>Interfaz</label><select id="pmk-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name} (${i.mode})</option>`).join('')}</select></div><div class="frow"><label>BSSID *</label><input id="pmk-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div><div class="fgrid"><div class="frow"><label>Canal</label><input id="pmk-ch" class="inp" type="number" value="6"></div><div class="frow"><label>Timeout</label><input id="pmk-to" class="inp" type="number" value="60"></div></div><button class="btn btn-g" style="width:100%" id="pmk-btn" onclick="doPmk()">Capturar PMKID</button><div id="pmk-res" style="margin-top:10px"></div></div><div class="card"><div class="ctitle">${ic('zap')} Crack PMKID</div><div class="frow"><label>Archivo PMKID</label><input id="pmkc-f" class="inp" placeholder="/data/pmkid/red.22000"></div><div class="frow"><label>BSSID</label><input id="pmkc-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div><div class="frow"><label>ESSID</label><input id="pmkc-essid" class="inp"></div><div class="frow"><label>Wordlist</label><select id="pmkc-wl" class="inp"><option value="rockyou.txt">rockyou.txt</option>${wls.map(w=>`<option value="${w.filename}">${w.filename}</option>`).join('')}</select></div><button class="btn btn-g" style="width:100%" onclick="doPmkCrack()">Crack PMKID</button><div id="pmkc-res" style="margin-top:10px"></div></div></div>`;}
+function aplT(ifaces,wls,caps){return `<div class="g2" style="margin-bottom:14px"><div class="card"><div class="ctitle">${ic('wifi')} AP-Less Honeypot</div><div class="alert aw">${ic('warn')}<div>Requiere 2 adaptadores. Crea AP falso para capturar handshakes.</div></div><div class="frow"><label>Iface Monitor</label><select id="apl-mon" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>Iface AP</label><select id="apl-ap" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="fgrid"><div class="frow"><label>ESSID AP falso</label><input id="apl-essid" class="inp" placeholder="FreeWiFi"></div><div class="frow"><label>Canal</label><input id="apl-ch" class="inp" type="number" value="6"></div></div><div class="fgrid"><div class="frow"><label>WPA</label><select id="apl-wpa" class="inp"><option value="2">WPA2</option><option value="1">WPA</option></select></div><div class="frow"><label>Pass falsa</label><input id="apl-pass" class="inp" value="fakepass123"></div></div><div style="display:flex;gap:7px"><button class="btn btn-g" style="flex:1" onclick="doAplStart()">Iniciar</button><button class="btn btn-d" style="flex:1" onclick="doAplStop()">Detener</button></div></div><div class="card"><div class="ctitle">${ic('refresh')} Estado + Deauth</div><div id="apl-st" class="empty" style="padding:18px">${ic('wifi',30)}<h3>Inactivo</h3></div><div style="border:1px solid var(--b0);border-radius:8px;padding:11px;margin-top:11px;background:var(--bg3)"><div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Deauth al AP legítimo</div><div class="frow"><label>BSSID AP legítimo</label><input id="apl-da-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div><div class="fgrid"><div class="frow"><label>Interfaz</label><select id="apl-da-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>Paquetes</label><input id="apl-da-pkts" class="inp" type="number" value="50"></div></div><button class="btn btn-d btn-sm" style="width:100%" onclick="doAplDA()">Enviar Deauth</button></div></div></div><div class="g2"><div class="card"><div class="ctitle">${ic('key')} Handshake Capturado</div><div id="apl-hs-st" class="empty" style="padding:18px">${ic('key',30)}<h3>Sin handshake</h3></div></div><div class="card"><div class="ctitle">${ic('zap')} Crack AP-Less</div><div class="frow"><label>Archivo</label><select id="apl-cr-f" class="inp"><option value="">— Selecciona —</option>${caps.map(c=>`<option value="${c.filepath}">${c.filename}${c.has_handshake?' ✓HS':''}</option>`).join('')}</select></div><div class="frow"><label>BSSID</label><input id="apl-cr-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div><div class="frow"><label>Wordlist</label><select id="apl-cr-wl" class="inp"><option value="rockyou.txt">rockyou.txt</option>${wls.map(w=>`<option value="${w.filename}">${w.filename}</option>`).join('')}</select></div><button class="btn btn-g" style="width:100%" onclick="doAplCrack()">Crack</button><div id="apl-cr-res" style="margin-top:10px"></div></div></div>`;}
+function entT(ifaces){return `<div class="g2"><div class="card"><div class="ctitle">${ic('shield')} Rogue RADIUS</div><div class="alert aw">${ic('warn')}<div>Captura credenciales EAP. Requiere 2 adaptadores.</div></div><div class="frow"><label>Iface Monitor</label><select id="ent-mon" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>Iface AP</label><select id="ent-ap" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="fgrid"><div class="frow"><label>ESSID objetivo</label><input id="ent-essid" class="inp" placeholder="Corp-WiFi"></div><div class="frow"><label>Canal</label><input id="ent-ch" class="inp" type="number" value="6"></div></div><div class="frow"><label>EAP</label><select id="ent-eap" class="inp"><option value="PEAP">PEAP</option><option value="TTLS">TTLS</option><option value="FAST">FAST</option></select></div><div style="display:flex;gap:7px;margin-top:8px"><button class="btn btn-g" style="flex:1" onclick="doEntStart()">Iniciar</button><button class="btn btn-d" style="flex:1" onclick="doEntStop()">Detener</button></div></div><div class="card"><div class="ctitle">${ic('key')} Credenciales</div><div id="ent-creds" class="empty" style="padding:20px">${ic('key',30)}<h3>Sin credenciales</h3></div></div></div>`;}
+function w3T(ifaces){return `<div class="card" style="max-width:500px"><div class="ctitle">${ic('zap')} Ataque WPA3</div><div class="alert ai">${ic('info')}<div>Downgrade, Transition Mode, DoS (Dragonblood).</div></div><div class="frow"><label>Interfaz</label><select id="w3-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="fgrid"><div class="frow"><label>BSSID</label><input id="w3-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div><div class="frow"><label>Canal</label><input id="w3-ch" class="inp" type="number" value="6"></div></div><div class="frow"><label>ESSID</label><input id="w3-essid" class="inp" placeholder="WPA3-Network"></div><div class="frow"><label>Tipo</label><select id="w3-type" class="inp"><option value="downgrade">Downgrade</option><option value="transition_mode">Transition Mode</option><option value="dos">DoS</option></select></div><button class="btn btn-g" style="width:100%;margin-top:8px" onclick="doW3()">Ejecutar</button><div id="w3-res" style="margin-top:10px"></div></div>`;}
+async function doPmk(){const i=document.getElementById('pmk-if')?.value,b=document.getElementById('pmk-bssid')?.value?.trim(),c=parseInt(document.getElementById('pmk-ch')?.value)||6,t=parseInt(document.getElementById('pmk-to')?.value)||60;if(!b){toast('BSSID obligatorio','warn');return;}const btn=document.getElementById('pmk-btn');if(btn)btn.disabled=true;const el=document.getElementById('pmk-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--y)"><div class="spin"></div> Capturando...</div>`;try{const r=await A.pmkidCap({interface:i,target_bssid:b,channel:c,timeout:t});if(el)el.innerHTML=`<div class="${r.pmkid_captured?'alert as':'alert aw'}">${r.pmkid_captured?ic('check'):ic('x')}<div>${r.pmkid_captured?'¡PMKID! '+r.pmkid_file:'Sin PMKID'}</div></div>`;toast(r.pmkid_captured?'PMKID capturado':'Sin PMKID',r.pmkid_captured?'success':'warn');}catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${e.message}</div>`;}if(btn)btn.disabled=false;}
+async function doPmkCrack(){const f=document.getElementById('pmkc-f')?.value?.trim(),b=document.getElementById('pmkc-bssid')?.value?.trim(),e2=document.getElementById('pmkc-essid')?.value?.trim(),wl=document.getElementById('pmkc-wl')?.value||'rockyou.txt';if(!f||!b){toast('Archivo y BSSID obligatorios','warn');return;}const el=document.getElementById('pmkc-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--y)"><div class="spin"></div> Crackeando...</div>`;try{const r=await A.pmkidCrack({pmkid_file:f,target_bssid:b,target_essid:e2,wordlist:wl});if(el)el.innerHTML=`<div class="${r.success?'alert as':'alert aw'}">${r.success?ic('check'):ic('x')}<div>${r.success?`Contraseña: <strong>${r.key}</strong>`:'Sin resultado'}</div></div>`;toast(r.success?'Pass: '+r.key:'Sin resultado',r.success?'success':'info');}catch(e){toast(e.message,'error');}}
+async function doAplStart(){const mon=document.getElementById('apl-mon')?.value,ap=document.getElementById('apl-ap')?.value,essid=document.getElementById('apl-essid')?.value?.trim(),ch=parseInt(document.getElementById('apl-ch')?.value)||6;if(!essid){toast('ESSID obligatorio','warn');return;}try{const r=await A.aplStart({monitor_interface:mon,ap_interface:ap,target_essid:essid,channel:ch,wpa_version:parseInt(document.getElementById('apl-wpa')?.value)||2,fake_passphrase:document.getElementById('apl-pass')?.value||'fake123',capture_timeout:300});toast(r.started?'AP-Less iniciado':'Error',r.started?'success':'error');pollAplSt();}catch(e){toast(e.message,'error');}}
+async function doAplStop(){try{await A.aplStop();toast('AP-Less detenido','success');}catch(e){toast(e.message,'error');}}
+async function doAplDA(){const i=document.getElementById('apl-da-if')?.value,b=document.getElementById('apl-da-bssid')?.value?.trim(),p=parseInt(document.getElementById('apl-da-pkts')?.value)||50;if(!b){toast('BSSID obligatorio','warn');return;}try{const r=await A.deauth({interface:i,target_bssid:b,client_mac:null,packets:p,reason:'AP-Less deauth'});toast(`Deauth: ${r.packets_sent} paquetes`,'success');}catch(e){toast(e.message,'error');}}
+async function doAplCrack(){const f=document.getElementById('apl-cr-f')?.value,b=document.getElementById('apl-cr-bssid')?.value?.trim(),wl=document.getElementById('apl-cr-wl')?.value||'rockyou.txt';if(!f||!b){toast('Archivo y BSSID obligatorios','warn');return;}const el=document.getElementById('apl-cr-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--y)"><div class="spin"></div> Crackeando...</div>`;try{const r=await A.crack({capture_file:f,target_bssid:b,wordlist:wl});if(el)el.innerHTML=`<div class="${r.success?'alert as':'alert aw'}">${r.success?ic('check'):ic('x')}<div>${r.success?`Contraseña: <strong>${r.key}</strong>`:'Sin resultado'}</div></div>`;toast(r.success?'Pass: '+r.key:'Sin resultado',r.success?'success':'info');}catch(e){toast(e.message,'error');}}
+async function pollAplSt(){try{const st=await A.aplSt();const el=document.getElementById('apl-st');if(!el)return;if(st.active){el.innerHTML=`<div class="alert as">${ic('check')}<div>Activo · ESSID: <strong>${st.target_essid||'—'}</strong></div></div><div style="font-size:.8rem;color:var(--t2);margin-top:6px">Capturas: <strong>${st.captures_count||0}</strong></div>`;const hs=document.getElementById('apl-hs-st');if(hs&&st.handshake_captured){hs.innerHTML=`<div class="alert as">${ic('check')}<div><strong>¡Handshake!</strong><br><span class="mono">${st.capture_file||''}</span></div></div>`;const s=document.getElementById('apl-cr-f');if(s&&st.capture_file){const o=document.createElement('option');o.value=st.capture_file;o.text=st.capture_file.split('/').pop()+' ✓HS';o.selected=true;s.add(o,1);}}}else{el.innerHTML=`<div class="empty" style="padding:16px">${ic('wifi',28)}<h3>Inactivo</h3></div>`;}}catch{}}
+async function doEntStart(){const mon=document.getElementById('ent-mon')?.value,ap=document.getElementById('ent-ap')?.value,essid=document.getElementById('ent-essid')?.value?.trim(),ch=parseInt(document.getElementById('ent-ch')?.value)||6,eap=document.getElementById('ent-eap')?.value;if(!essid){toast('ESSID obligatorio','warn');return;}try{const r=await fetch(API+'/advanced/enterprise/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monitor_interface:mon,ap_interface:ap,target_essid:essid,channel:ch,eap_type:eap,capture_creds:true})}).then(r=>r.json());toast(r.started?'Enterprise iniciado':'Error',r.started?'success':'error');}catch(e){toast(e.message,'error');}}
+async function doEntStop(){try{await fetch(API+'/advanced/enterprise/stop',{method:'POST'});toast('Detenido','success');}catch(e){toast(e.message,'error');}}
+async function doW3(){const i=document.getElementById('w3-if')?.value,b=document.getElementById('w3-bssid')?.value?.trim(),e2=document.getElementById('w3-essid')?.value?.trim(),c=parseInt(document.getElementById('w3-ch')?.value)||6,t=document.getElementById('w3-type')?.value;if(!b){toast('BSSID obligatorio','warn');return;}const el=document.getElementById('w3-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--y)"><div class="spin"></div> Ejecutando...</div>`;try{const r=await A.wpa3({interface:i,target_bssid:b,target_essid:e2,channel:c,attack_type:t,timeout:120});if(el)el.innerHTML=`<div class="${r.success?'alert as':'alert aw'}">${r.success?ic('check'):ic('x')}<div>${t} · ${r.success?'Exitoso':'Sin resultado'}</div></div>`;toast(r.success?'OK':'Sin resultado',r.success?'success':'info');}catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${e.message}</div>`;}}
+</script><script>
+// ======== ATTACKS ========
+async function attacks(){
+  let ifaces=[];try{ifaces=await A.ifaces();}catch{}
+  setC(`<div class="sup"><div class="alert aw" style="margin-bottom:14px">${ic('warn')}<div><strong>Solo para uso legal y autorizado</strong> en redes propias o con permiso escrito.</div></div>
+  <div class="tabs" id="att-tabs"><div class="tab active" onclick="swTab('att-tabs','att-tc',0)">Evil Twin</div><div class="tab" onclick="swTab('att-tabs','att-tc',1)">MITM</div><div class="tab" onclick="swTab('att-tabs','att-tc',2)">Flujos</div></div>
+  <div class="tc active" id="att-tc-0">${etT(ifaces)}</div>
+  <div class="tc" id="att-tc-1">${mitmT(ifaces)}</div>
+  <div class="tc" id="att-tc-2">${flowsT()}</div></div>`);
+  pollAttSt();}
+function etT(ifaces){return `<div class="g2"><div class="card"><div class="ctitle">${ic('wifi')} Evil Twin AP</div><div class="frow"><label>Interfaz AP</label><select id="et-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="fgrid"><div class="frow"><label>ESSID *</label><input id="et-essid" class="inp" placeholder="MyWiFi"></div><div class="frow"><label>Canal</label><input id="et-ch" class="inp" type="number" value="6"></div></div><div class="frow"><label>Iface internet</label><input id="et-inet" class="inp" placeholder="eth0"></div><div class="crow"><input type="checkbox" id="et-portal"><label for="et-portal">Captive Portal</label></div><div class="crow"><input type="checkbox" id="et-da" onchange="document.getElementById('et-da-opts').style.display=this.checked?'block':'none'"><label for="et-da">Deauth al AP legítimo</label></div><div id="et-da-opts" style="display:none;margin-bottom:10px;padding:10px;background:var(--bg3);border-radius:8px"><div class="fgrid"><div class="frow"><label>Iface deauth</label><select id="et-dif" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>BSSID legítimo</label><input id="et-dbssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div></div></div><div style="display:flex;gap:7px"><button class="btn btn-g" style="flex:1" onclick="doETStart()">Iniciar</button><button class="btn btn-d" style="flex:1" onclick="doETStop()">Detener</button></div></div><div class="card"><div class="ctitle">${ic('wifi')} Estado ET</div><div id="et-st" class="empty" style="padding:20px">${ic('wifi',30)}<h3>Inactivo</h3></div></div></div>`;}
+function mitmT(ifaces){return `<div class="g2"><div class="card"><div class="ctitle">${ic('shield')} MITM</div><div class="frow"><label>Interfaz (LAN)</label><select id="mitm-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>IPs objetivo (vacío=todos)</label><input id="mitm-tgts" class="inp" placeholder="192.168.0.5,192.168.0.10"></div><div class="frow"><label>Gateway</label><input id="mitm-gw" class="inp" placeholder="192.168.0.1"></div><div class="frow"><label>Puerto proxy</label><input id="mitm-port" class="inp" type="number" value="8080"></div><div class="crow"><input type="checkbox" id="mitm-st" checked><label for="mitm-st">Modo Stealth</label></div><div class="crow"><input type="checkbox" id="mitm-cr"><label for="mitm-cr">Capturar credenciales</label></div><div style="display:flex;gap:7px;margin-top:8px"><button class="btn btn-g" style="flex:1" onclick="doMitmStart()">Iniciar</button><button class="btn btn-d" style="flex:1" onclick="doMitmStop()">Detener</button></div></div><div class="card"><div class="ctitle">${ic('shield')} Estado MITM</div><div id="mitm-st-el" class="empty" style="padding:20px">${ic('shield',30)}<h3>Inactivo</h3></div></div></div>`;}
+function flowsT(){return `<div class="card"><div style="display:flex;justify-content:space-between;margin-bottom:12px"><div class="ctitle" style="margin-bottom:0">${ic('search')} Flujos</div><div style="display:flex;gap:7px;align-items:center"><label class="crow" style="margin-bottom:0"><input type="checkbox" id="fl-cr"><span>Solo credenciales</span></label><button class="btn btn-gh btn-sm" onclick="loadFlows()">Cargar</button></div></div><div id="fl-table" class="empty" style="padding:28px">${ic('search',36)}<h3>Sin flujos</h3></div></div>`;}
+async function pollAttSt(){try{const [e,m]=await Promise.all([A.etSt().catch(()=>null),A.mitmSt().catch(()=>null)]);renderAttSt(e,'et-st');renderAttSt(m,'mitm-st-el');}catch{}}
+function renderAttSt(st,id){const el=document.getElementById(id);if(!el||!st||!st.active)return;el.innerHTML=`<div class="alert as" style="margin-bottom:10px">${ic('check')}<div>Activo · ${fd(st.started_at)}</div></div><div style="font-size:.8rem;display:flex;flex-direction:column;gap:5px">${st.target_essid?`<div><span style="color:var(--t2)">ESSID:</span> <strong>${st.target_essid}</strong></div>`:''} ${st.mode?`<div><span style="color:var(--t2)">Modo:</span> <span class="badge b-c">${st.mode}</span></div>`:''} ${st.connected_clients!=null?`<div><span style="color:var(--t2)">Clientes:</span> <strong>${st.connected_clients}</strong></div>`:''} ${st.captured_credentials!=null?`<div><span style="color:var(--t2)">Credenciales:</span> <strong style="color:var(--r)">${st.captured_credentials}</strong></div>`:''}</div>`;}
+async function doETStart(){const i=document.getElementById('et-if')?.value,e=document.getElementById('et-essid')?.value?.trim(),c=parseInt(document.getElementById('et-ch')?.value)||6,in2=document.getElementById('et-inet')?.value?.trim(),p=document.getElementById('et-portal')?.checked,da=document.getElementById('et-da')?.checked;if(!e){toast('ESSID obligatorio','warn');return;}try{const r=await A.etStart({interface:i,target_essid:e,channel:c,internet_interface:in2||null,captive_portal:p,deauth_legitimate:da,deauth_interface:da?document.getElementById('et-dif')?.value:null,deauth_bssid:da?document.getElementById('et-dbssid')?.value?.trim():null,deauth_packets:50});toast(r.started?'ET iniciado':'Error',r.started?'success':'error');pollAttSt();}catch(e2){toast(e2.message,'error');}}
+async function doETStop(){try{await A.etStop();toast('ET detenido','success');pollAttSt();}catch(e){toast(e.message,'error');}}
+async function doMitmStart(){const i=document.getElementById('mitm-if')?.value,gw=document.getElementById('mitm-gw')?.value?.trim(),port=parseInt(document.getElementById('mitm-port')?.value)||8080,st=document.getElementById('mitm-st')?.checked,cr=document.getElementById('mitm-cr')?.checked,t=document.getElementById('mitm-tgts')?.value?.trim();try{const r=await A.mitmStart({interface:i,target_ips:t?t.split(',').map(x=>x.trim()).filter(Boolean):[],gateway:gw,proxy_port:port,stealth:st,ssl_strip:false,capture_credentials:cr});toast(r.started?`MITM iniciado (${r.mode})`:'Error',r.started?'success':'error');pollAttSt();}catch(e){toast(e.message,'error');}}
+async function doMitmStop(){try{await A.mitmStop();toast('MITM detenido','success');pollAttSt();}catch(e){toast(e.message,'error');}}
+async function loadFlows(){const cr=document.getElementById('fl-cr')?.checked||false;const el=document.getElementById('fl-table');if(!el)return;try{const[ef,mf]=await Promise.all([A.etFlows(50).catch(()=>null),A.mitmFlows(50,cr).catch(()=>null)]);const all=[...((ef?.flows)||[]),...((mf?.flows)||[])].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));if(!all.length){el.innerHTML=`<div class="empty" style="padding:24px">${ic('search',30)}<h3>Sin flujos</h3></div>`;return;}el.innerHTML=`<div class="twrap"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Cliente</th><th>Host</th><th>Método</th><th>Estado</th></tr></thead><tbody>${all.slice(0,50).map(f=>`<tr ${f.has_credentials?'style="background:var(--r2)"':''}><td class="mono" style="font-size:.66rem;color:var(--t2)">${fd(f.timestamp)}</td><td><span class="badge ${f.type==='http'?'b-o':f.type==='dns'?'b-c':'b-p'}">${f.type||'—'}</span></td><td class="mono" style="font-size:.7rem">${f.client_ip||'—'}</td><td style="font-size:.76rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.host||'—'}</td><td class="mono" style="font-size:.7rem">${f.method||'—'}</td><td>${f.has_credentials?`<span class="badge b-r">CREDS</span>`:`<span class="badge b-x">${f.status_code||'—'}</span>`}</td></tr>`).join('')}</tbody></table></div>`;}catch(e){toast(e.message,'error');}}
+// ======== CAPTURES ========
+async function captures(){
+  setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
+  const sid=ST.activeSession?.id;let caps=[];try{caps=await A.caps(sid||null);}catch(e){toast(e.message,'error');}
+  const arr=Array.isArray(caps)?caps:[];
+  setC(`<div class="sup">${sid?`<div class="alert ai" style="margin-bottom:12px">${ic('info')}<div>Sesión: <strong>${ST.activeSession.name}</strong></div></div>`:''}<div class="card"><div class="ctitle">${ic('download')} Capturas (${arr.length})</div>${!arr.length?`<div class="empty" style="padding:38px">${ic('download',40)}<h3>Sin capturas</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Tipo</th><th>Red</th><th>Tamaño</th><th>HS</th><th>PMKID</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>${arr.map(c=>`<tr><td class="mono" style="font-size:.7rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.filepath}">${c.filename}</td><td><span class="badge b-c">${c.file_type||'—'}</span></td><td style="font-size:.76rem">${c.target_essid||'—'}</td><td class="mono" style="font-size:.72rem">${fb(c.size_bytes)}</td><td>${c.has_handshake?`<span class="badge b-g">${ic('check',11)} SÍ</span>`:`<span class="badge b-x">NO</span>`}</td><td>${c.has_pmkid?`<span class="badge b-g">${ic('check',11)} SÍ</span>`:`<span class="badge b-x">NO</span>`}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(c.created_at)}</td><td><div style="display:flex;gap:4px"><button class="btn btn-p btn-xs" onclick="checkCap('${c.filepath}','${c.filename}')">${ic('eye',11)} Verificar</button><button class="btn btn-d btn-xs btn-ico" onclick="delCap('${c.filepath}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div></div>`);}
+async function checkCap(fp,fn){
+  showModal(`Verificando — ${fn}`,`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Analizando...</div>`,'',true);
+  try{const r=await A.checkHS(fp);showModal(`Análisis — ${fn}`,`<div style="display:flex;gap:9px;margin-bottom:14px;flex-wrap:wrap">
+    <div style="flex:1;text-align:center;padding:13px;background:var(--bg3);border-radius:8px;border:1px solid ${r.has_handshake?'var(--g)':'var(--b0)'}"><div style="font-size:1.4rem">${r.has_handshake?'✅':'❌'}</div><div style="font-size:.68rem;color:var(--t2);margin-top:4px;text-transform:uppercase">Handshake</div></div>
+    <div style="flex:1;text-align:center;padding:13px;background:var(--bg3);border-radius:8px;border:1px solid ${r.has_pmkid?'var(--g)':'var(--b0)'}"><div style="font-size:1.4rem">${r.has_pmkid?'✅':'❌'}</div><div style="font-size:.68rem;color:var(--t2);margin-top:4px;text-transform:uppercase">PMKID</div></div>
+    <div style="flex:1;text-align:center;padding:13px;background:var(--bg3);border-radius:8px;border:1px solid var(--b0)"><div style="font-size:1.4rem;font-weight:700;font-family:'Orbitron',monospace;color:var(--c)">${r.networks_found||0}</div><div style="font-size:.68rem;color:var(--t2);margin-top:4px;text-transform:uppercase">Redes</div></div>
+  </div>
+  <div style="font-size:.7rem;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">Output de aircrack-ng</div>
+  <pre style="background:var(--bg0);border:1px solid var(--b0);border-radius:8px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--t1);white-space:pre-wrap;line-height:1.6;max-height:420px;overflow-y:auto;word-break:break-all">${r.raw_output||'(sin output)'}</pre>`,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`,true);}catch(e){toast(e.message,'error');closeModal();}}
+function delCap(fp){confirmDlg('¿Eliminar captura?',async()=>{try{await A.delCap(fp);toast('Eliminada','success');captures();}catch(e){toast(e.message,'error');}});}
+// ======== WORDLISTS ========
+let _seeds=JSON.parse(localStorage.getItem('wl-seeds')||'[]'),_presets=[];
+async function wordlists(){
+  setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
+  let wls={},pr={};try{[wls,pr]=await Promise.all([A.wls(),A.presets().catch(()=>({presets:[]}))]);}catch(e){console.warn('wordlists load error',e);}_presets=pr.presets||[];
+  const wlArr=wls.wordlists||[];
+  const MUT=[
+    {id:'use_lowercase',   l:'Minúsculas',        ex:'empresa → empresa',          d:'Convierte todas las letras a minúsculas',          def:true},
+    {id:'use_uppercase',   l:'Mayúsculas',         ex:'empresa → EMPRESA',          d:'Convierte todas las letras a mayúsculas',          def:true},
+    {id:'use_capitalize',  l:'Capitalizar',        ex:'empresa → Empresa',          d:'Primera letra en mayúscula, resto minúsculas',     def:true},
+    {id:'use_leet',        l:'Leet speak',         ex:'empresa → 3mpr3s4',          d:'Sustituye letras por números/símbolos (e→3, a→4)', def:true},
+    {id:'use_numbers',     l:'Sufijos numéricos',  ex:'empresa → empresa123',       d:'Añade secuencias de números al final',             def:true},
+    {id:'use_years',       l:'Años',               ex:'empresa → empresa2024',      d:'Añade años comunes: 2020, 2021 … 2030',           def:true},
+    {id:'use_symbols',     l:'Símbolos',           ex:'empresa → empresa!',         d:'Añade !, @, #, $ … al final de la palabra',       def:true},
+    {id:'combine_words',   l:'Combinar palabras',  ex:'[A,B] → AB, BA, A_B',       d:'Combina las semillas entre sí',                   def:true},
+    {id:'use_reverse',     l:'Reverso',            ex:'empresa → aserpme',          d:'Invierte el orden de los caracteres',              def:false},
+    {id:'use_doubling',    l:'Duplicar',           ex:'empresa → empresaempresa',   d:'Repite la palabra dos veces',                     def:false},
+    {id:'add_spanish_base',l:'Base española',      ex:'→ contraseña, acceso...',    d:'Añade ~250 palabras comunes en español',           def:false},
+    {id:'add_spanish_names',l:'Nombres españoles', ex:'→ Juan, María, Carlos...',   d:'Añade los 100 nombres más frecuentes en España',  def:false},
+  ];
+  setC(`<div class="sup"><div class="g2" style="margin-bottom:16px;align-items:start">
+    <div class="card" id="wl-form" data-pp="wl-form">
+      <div class="ctitle">${ic('zap')} Generar Wordlist</div>
+      <div class="frow"><label>Palabras semilla</label>
+        <div class="seed-box" id="sbox" onclick="document.getElementById('sinput').focus()">
+          <input id="sinput" placeholder="Escribe y pulsa Enter o usa comas..." onkeydown="hSK(event)" oninput="hSI(event)">
+        </div>
+        <div style="display:flex;gap:5px;margin-top:5px">
+          <input id="spaste" class="inp" style="flex:1" placeholder="Pegar varias separadas por coma: nombre,empresa,2024">
+          <button class="btn btn-gh btn-xs" onclick="addPaste()">Añadir</button>
+        </div>
+      </div>
+      ${_presets.length?`<div class="frow"><label>Preset</label><select id="wl-preset" class="inp" onchange="applyPreset(this)"><option value="">— Personalizado —</option>${_presets.map(p=>`<option value="${p.id}">${p.label} (~${(p.estimated_count||0).toLocaleString()})</option>`).join('')}</select></div>`:''}
+      <div class="frow"><label>Nombre del archivo</label><input id="wl-name" class="inp" value="custom.txt" data-p></div>
+      <div class="fgrid" style="margin-bottom:12px"><div class="frow"><label>Long. mínima</label><input id="wl-min" class="inp" type="number" value="6" data-p></div><div class="frow"><label>Long. máxima</label><input id="wl-max" class="inp" type="number" value="32" data-p></div></div>
+      <div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Mutaciones</div>
+      <div class="mgrid">${MUT.map(m=>`<div class="mitem ${m.def?'on':''}" onclick="togM(this,'${m.id}')">
+        <div class="mlabel"><input type="checkbox" id="${m.id}" ${m.def?'checked':''} onclick="event.stopPropagation();this.closest('.mitem').classList.toggle('on',this.checked)" data-p>${m.l}</div>
+        <div class="mex">${m.ex}</div>
+        <div class="mdesc">${m.d}</div>
+      </div>`).join('')}</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn btn-gh btn-sm" onclick="doEstWL()">Estimar</button><button class="btn btn-gh btn-sm" onclick="doPrevWL()">Preview</button><button class="btn btn-g btn-sm" style="flex:1" id="wl-gen-btn" onclick="doGenWL()">${ic('zap')} Generar</button></div>
+      <div id="wl-est" style="margin-top:9px"></div>
+    </div>
+    <div class="card"><div class="ctitle">${ic('eye')} Preview / Resultado</div><div id="wl-prev" class="empty" style="padding:24px">${ic('zap',36)}<h3>Sin preview</h3><p>Usa Preview o Generar</p></div></div>
+  </div>
+  <div class="card"><div class="ctitle">${ic('download')} Wordlists Disponibles</div><div style="font-size:.76rem;color:var(--t2);margin-bottom:12px">${wls.total||0} archivos · ${wls.total_size_human||'—'} · <span class="mono">${wls.directory||'—'}</span></div>
+  ${!wlArr.length?`<div class="empty" style="padding:28px">${ic('download',36)}<h3>Sin wordlists</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Líneas</th><th>Tamaño</th><th>Muestra</th><th>Modificado</th><th></th></tr></thead><tbody>${wlArr.map(w=>`<tr><td class="mono">${w.filename}</td><td class="mono"><strong>${(w.lines||0).toLocaleString()}</strong></td><td class="mono">${w.size_human||fb(w.size_bytes)}</td><td style="font-size:.68rem;color:var(--t2);font-family:'JetBrains Mono',monospace">${(w.sample_first||[]).slice(0,4).join(', ')}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(w.modified_at)}</td><td><div style="display:flex;gap:4px"><a class="btn btn-gh btn-xs" href="${API}/wordlists/${w.filename}/download" target="_blank">${ic('download',11)}</a><button class="btn btn-d btn-xs btn-ico" onclick="doDelWL('${w.filename}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div>
+  </div>`);
+  restFP('wl-form');renderSeeds();}
+function togM(el,id){const cb=document.getElementById(id);if(cb){cb.checked=!cb.checked;el.classList.toggle('on',cb.checked);}}
+function renderSeeds(){const box=document.getElementById('sbox');if(!box)return;const inp=document.getElementById('sinput');box.querySelectorAll('.stag').forEach(e=>e.remove());_seeds.forEach(s=>{const t=document.createElement('span');t.className='stag';t.innerHTML=`${s}<span class="stag-x" onclick="rmSeed('${s}')">×</span>`;box.insertBefore(t,inp);});if(inp)inp.placeholder=_seeds.length?'Añadir más...':'Escribe y pulsa Enter o usa comas...';}
+function addSeed(w){w=w.trim();if(!w||_seeds.includes(w))return;_seeds.push(w);localStorage.setItem('wl-seeds',JSON.stringify(_seeds));renderSeeds();}
+function rmSeed(w){_seeds=_seeds.filter(s=>s!==w);localStorage.setItem('wl-seeds',JSON.stringify(_seeds));renderSeeds();}
+function hSK(e){if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.replace(/,/g,'').trim();if(v)addSeed(v);e.target.value='';}else if(e.key==='Backspace'&&!e.target.value.length&&_seeds.length){rmSeed(_seeds[_seeds.length-1]);}}
+function hSI(e){if(e.target.value.includes(',')){const p=e.target.value.split(',');p.slice(0,-1).forEach(s=>{if(s.trim())addSeed(s);});e.target.value=p[p.length-1];}}
+function addPaste(){const inp=document.getElementById('spaste');if(!inp?.value)return;inp.value.split(',').map(s=>s.trim()).filter(Boolean).forEach(addSeed);inp.value='';toast('Palabras añadidas','success');}
+function getWLC(){const M={use_lowercase:false,use_uppercase:false,use_capitalize:false,use_leet:false,use_numbers:false,use_years:false,use_symbols:false,combine_words:false,use_reverse:false,use_doubling:false,add_spanish_base:false,add_spanish_names:false};Object.keys(M).forEach(k=>{const e=document.getElementById(k);if(e)M[k]=e.checked;});return{seed_words:_seeds,output_filename:document.getElementById('wl-name')?.value||'custom.txt',min_length:parseInt(document.getElementById('wl-min')?.value)||6,max_length:parseInt(document.getElementById('wl-max')?.value)||32,leet_intensity:'medium',use_double_symbols:true,use_symbol_pairs:true,use_separators:true,use_reverse_combine:true,use_birth_years:true,number_max_length:4,add_common_base:true,use_alternating_case:false,use_stretching:false,use_palindrome:false,use_number_infix:true,combine_3_words:false,max_total:10000000,...M};}
+async function doEstWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const el=document.getElementById('wl-est');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--t2);font-size:.76rem"><div class="spin"></div> Estimando...</div>`;try{const r=await A.estimateWL(getWLC());if(el)el.innerHTML=`<div style="font-size:.78rem;color:var(--t1);display:flex;gap:12px;flex-wrap:wrap"><div>Total: <strong style="color:var(--g)">${r.estimated_count_human}</strong></div><div>Tamaño: <strong>${r.estimated_size_human}</strong></div><div>Tiempo: <strong>~${r.estimated_time_seconds}s</strong></div></div>`;}catch(e){toast(e.message,'error');if(el)el.innerHTML='';}}
+async function doPrevWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const el=document.getElementById('wl-prev');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--t2)"><div class="spin"></div> Generando preview...</div>`;try{const r=await A.previewWL(getWLC());const cats=Object.entries(r.categories||{});if(el)el.innerHTML=`<div style="max-height:360px;overflow-y:auto">${cats.map(([cat,s])=>`<div style="margin-bottom:10px"><div style="font-size:.62rem;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">${cat}</div><div style="display:flex;gap:4px;flex-wrap:wrap">${s.slice(0,10).map(w=>`<span class="kbd">${w}</span>`).join('')}</div></div>`).join('')}</div>`;}catch(e){toast(e.message,'error');}}
+async function doGenWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const btn=document.getElementById('wl-gen-btn');if(btn)btn.disabled=true;const el=document.getElementById('wl-prev');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Generando...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;try{const r=await A.genWL(getWLC());if(el)el.innerHTML=`<div class="alert as" style="margin-bottom:12px">${ic('check')}<div><strong>¡Generada!</strong> ${(r.total_passwords||0).toLocaleString()} contraseñas en ${r.elapsed_seconds}s</div></div><div style="font-size:.76rem;color:var(--t2)">Archivo: <span class="mono" style="color:var(--g)">${r.path}</span></div><div style="font-size:.76rem;color:var(--t2)">Tamaño: ${r.file_size_human} · ${Math.round(r.rate_per_second||0).toLocaleString()} pass/s</div>`;toast(`Wordlist: ${(r.total_passwords||0).toLocaleString()} entradas`,'success');wordlists();}catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;if(btn)btn.disabled=false;}}
+function doDelWL(fn){confirmDlg(`¿Eliminar "${fn}"?`,async()=>{try{await A.delWL(fn);toast('Eliminada','success');wordlists();}catch(e){toast(e.message,'error');}});}
+async function applyPreset(sel){const id=sel.value;if(!id)return;const p=_presets.find(x=>x.id===id);if(!p?.config)return;const c=p.config;['use_lowercase','use_uppercase','use_capitalize','use_leet','use_numbers','use_years','use_symbols','combine_words','use_reverse','use_doubling','add_spanish_base','add_spanish_names'].forEach(k=>{if(k in c){const e=document.getElementById(k);if(e){e.checked=c[k];e.closest('.mitem')?.classList.toggle('on',c[k]);}}});if(c.min_length){const e=document.getElementById('wl-min');if(e)e.value=c.min_length;}if(c.max_length){const e=document.getElementById('wl-max');if(e)e.value=c.max_length;}toast(`Preset "${p.label}" aplicado`,'success');await doEstWL();}
+// ======== SYSTEM ========
+async function system(){
+  setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
+  let pf=null,procs=[];try{[pf,procs]=await Promise.all([A.preflight(),A.procs()]);}catch{}
+  const sys=pf?.system||{},tools=pf?.tools||{},byC={};
+  Object.entries(tools).forEach(([n,t])=>{const c=t.category||'other';if(!byC[c])byC[c]=[];byC[c].push([n,t]);});
+  setC(`<div class="sup"><div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="ctitle">${ic('cpu')} Información del Sistema</div>
+      ${[['Hostname',sys.hostname,'var(--c)'],['OS',sys.os,null],['Kernel',sys.kernel||'—',null],['Usuario',sys.user,null],['Root',sys.is_root?'SÍ ✓':'NO ✗',sys.is_root?'var(--g)':'var(--r)'],['CPU Cores',sys.cpu_count,null],['RAM',sys.memory_total_gb?sys.memory_total_gb+' GB':'—',null],['Python',sys.python_version,null]].map(([k,v,col])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--b0)"><span style="color:var(--t2);font-size:.74rem;text-transform:uppercase;letter-spacing:.06em">${k}</span><span class="mono" style="color:${col||'var(--t0)'}">${v||'—'}</span></div>`).join('')}
+      <div style="margin-top:12px">${pf?.ready?`<span class="badge b-g" style="font-size:.7rem">✅ Sistema Listo</span>`:`<span class="badge b-r" style="font-size:.7rem">❌ No Listo</span>`}</div>
+      ${(pf?.missing_critical||[]).length?`<div class="alert aw" style="margin-top:10px">${ic('warn')}<div><strong>Críticos faltantes:</strong> ${pf.missing_critical.join(', ')}</div></div>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="ctitle">${ic('search')} Búsqueda OUI / Fabricante</div>
+        <div style="display:flex;gap:7px">
+          <input id="oui-in" class="inp" placeholder="AA:BB:CC:DD:EE:FF" style="flex:1" onkeydown="if(event.key==='Enter')doOUI(this.value.trim())">
+          <button class="btn btn-p" onclick="doOUI(document.getElementById('oui-in').value.trim())">Buscar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ctitle">${ic('refresh')} Procesos (${procs.length})</div>
+        ${!procs.length?`<div class="empty" style="padding:14px">${ic('refresh',26)}<h3>Sin procesos</h3></div>`:`<div style="max-height:200px;overflow-y:auto">${procs.map(p=>`<div style="padding:6px 0;border-bottom:1px solid var(--b0);display:flex;align-items:flex-start;gap:8px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">${stb(p.status)}<span class="mono" style="font-size:.67rem;color:var(--t2)">${p.id}</span><span style="font-size:.64rem;color:var(--t2)">${fd(p.started_at)}</span></div><div class="mono" style="font-size:.63rem;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.command}</div></div>${p.status==='running'?`<button class="btn btn-d btn-xs" onclick="cancelPS('${p.id}')">Stop</button>`:''}</div>`).join('')}</div>`}
+      </div>
+    </div>
+  </div>
+  ${Object.entries(byC).map(([cat,ts])=>`<div class="card" style="margin-bottom:11px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px"><div class="ctitle" style="margin-bottom:0">${ic('zap')} ${cat.toUpperCase().replace(/_/g,' ')}</div><div style="display:flex;gap:5px"><span class="badge b-g">${ts.filter(([,t])=>t.installed).length} ok</span>${ts.filter(([,t])=>!t.installed&&t.critical).length?`<span class="badge b-r">${ts.filter(([,t])=>!t.installed&&t.critical).length} críticos</span>`:''}</div></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(182px,1fr));gap:8px">${ts.map(([n,t])=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--bg3);border-radius:8px;border:1px solid ${t.installed?'rgba(0,255,136,.2)':'rgba(255,59,92,.18)'}"><div style="width:7px;height:7px;border-radius:50%;background:${t.installed?'var(--g)':'var(--r)'};flex-shrink:0;${t.installed?'box-shadow:0 0 5px var(--g)':''}"></div><div style="flex:1;min-width:0"><div class="mono" style="font-size:.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</div><div style="font-size:.62rem;color:${t.installed?'var(--t2)':'var(--r)'}">${t.installed?(t.version||'instalado'):'no instalado'}</div></div>${t.critical&&!t.installed?`<span class="badge b-r" style="font-size:.54px;padding:1px 3px">CRIT</span>`:''}</div>`).join('')}</div></div>`).join('')}
+  </div>`);}
+async function cancelPS(id){try{await A.cancelProc(id);toast('Cancelado','success');system();}catch(e){toast(e.message,'error');}}
+async function doOUI(mac){if(!mac){toast('Introduce una MAC','warn');return;}try{const r=await A.oui(mac);showModal('OUI / Fabricante',`<div style="padding:13px;background:var(--bg0);border-radius:8px;border:1px solid var(--b1);margin-bottom:10px"><div class="mono" style="font-size:1rem;color:var(--c);margin-bottom:7px">${r.mac}</div><div style="font-size:.84rem;margin-bottom:5px"><span style="color:var(--t2)">Fabricante:</span> <strong>${r.manufacturer||'Desconocido'}</strong></div><div style="font-size:.8rem"><span style="color:var(--t2)">OUI:</span> <span class="mono">${r.oui||'—'}</span></div></div>${r.is_randomized?`<div class="alert aw">${ic('warn')}<div>MAC aleatorizada (privacidad)</div></div>`:`<span class="badge b-g">✓ MAC estática</span>`}`,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`);}catch(e){toast(e.message,'error');}}
+// ======== INIT ========
+async function init(){
+  applyTheme(ST.theme);updateSB();
+  await checkHealth();await pollProcs();
+  goto('dashboard');
+  setInterval(checkHealth,30000);setInterval(pollProcs,5000);
+  startClock();
+  if(ST.activeSession?.id){A.getSession(ST.activeSession.id).then(s=>{if(s)setSession(s);}).catch(()=>{});}
+}
+init();
+</script>
+</body>
+</html>

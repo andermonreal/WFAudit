@@ -57,6 +57,7 @@ from app.routers.attacks import router as attacks_router
 from app.routers.advanced import router as advanced_router
 from app.routers.captures import router as captures_router
 from app.routers.sessions import router as sessions_router
+from app.routers.wordlists import router as wordlists_router
 
 app.include_router(system_router)
 app.include_router(interfaces_router)
@@ -66,6 +67,7 @@ app.include_router(attacks_router)
 app.include_router(advanced_router)
 app.include_router(captures_router)
 app.include_router(sessions_router)
+app.include_router(wordlists_router)
 
 
 @app.get("/", tags=["Root"])

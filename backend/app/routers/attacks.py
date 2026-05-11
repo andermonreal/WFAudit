@@ -11,7 +11,7 @@ router = APIRouter(prefix="/attacks", tags=["Attack Vectors"])
 
 @router.post("/evil-twin/start")
 async def start_evil_twin(req: EvilTwinRequest):
-    """Launch Evil Twin with optional deauth of legitimate AP."""
+    """Launch Evil Twin with optional deauth of legitimate AP + traffic monitoring."""
     return await evil_twin_service.start(req)
 
 @router.post("/evil-twin/stop")
@@ -21,6 +21,37 @@ async def stop_evil_twin():
 @router.get("/evil-twin/status")
 async def evil_twin_status():
     return evil_twin_service.status()
+
+@router.get("/evil-twin/flows")
+async def evil_twin_flows(
+    limit: int = 100,
+    host: Optional[str] = None,
+    method: Optional[str] = None,
+):
+    """
+    Get captured flows from clients connected to the Evil Twin.
+    Shows DNS queries, TLS SNI, and HTTP requests from all connected devices.
+    """
+    return await evil_twin_service.get_flows(
+        limit=limit, host_filter=host, method_filter=method
+    )
+
+@router.post("/evil-twin/deauth")
+async def standalone_deauth(req: dict):
+    """
+    Standalone deauth attack — does NOT require active Evil Twin.
+    
+    Required: interface, target_bssid
+    Optional: client_mac (specific client, default broadcast),
+              packets (default 50), channel (default current)
+    """
+    return await evil_twin_service.standalone_deauth(
+        interface=req.get("interface"),
+        target_bssid=req.get("target_bssid"),
+        client_mac=req.get("client_mac"),
+        packets=req.get("packets", 50),
+        channel=req.get("channel"),
+    )
 
 @router.post("/mitm/start")
 async def start_mitm(req: MitmRequest):
