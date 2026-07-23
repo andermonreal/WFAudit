@@ -1,16 +1,29 @@
-# React + Vite
+# WFAudit — React Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The primary web UI for **WFAudit**, the WiFi security auditing platform. Built with React 19 + Vite. It talks to the FastAPI backend at `http://localhost:8000`.
 
-Currently, two official plugins are available:
+> You normally **don't run this directly** — use the project control script from the repo root, which starts the backend and both interfaces together:
+>
+> ```bash
+> sudo ./wfaudit start        # → http://localhost:5173
+> ```
+>
+> See the [main README](../../README.md) for full setup and usage.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Running standalone (development)
 
-## React Compiler
+```bash
+npm install
+npm run dev -- --host      # dev server on http://localhost:5173
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The backend must be running on port 8000 for the UI to work. The backend base URL is defined at the top of [`src/App.jsx`](src/App.jsx).
 
-## Expanding the ESLint configuration
+## Scripts
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Vite dev server. |
+| `npm run build` | Production build into `dist/`. |
+| `npm run preview` | Preview the production build. |
+| `npm run lint` | Run ESLint. |

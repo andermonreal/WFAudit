@@ -1,0 +1,578 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# WFAudit — WiFi Security Auditing Platform · Management Script
+# ═══════════════════════════════════════════════════════════════
+#
+#   ./wfaudit install    Instala TODO (sistema + Python + Node)
+#   ./wfaudit start      Arranca backend + doble interfaz web
+#   ./wfaudit stop       Para todo y restaura la red
+#   ./wfaudit restart    stop + start
+#   ./wfaudit status     Estado de los servicios
+#   ./wfaudit logs       Tail de los logs en tiempo real
+#   ./wfaudit preflight  Verifica las herramientas del sistema
+#   ./wfaudit clean      Borra .venv, node_modules, logs, .pids
+#   ./wfaudit help       Esta ayuda
+#
+# Estructura esperada (ejecutar desde la raíz del repo):
+#   /repo-root/
+#     ├── wfaudit                 (este script)
+#     ├── backend/                (FastAPI)
+#     │   └── requirements.txt
+#     └── frontend/
+#         ├── wfaudit.html        (interfaz standalone — un solo fichero)
+#         └── React/              (interfaz React + Vite)
+#             └── package.json
+#
+# El backend necesita root para operaciones WiFi (monitor mode,
+# inyección, iptables, raw sockets). install/start/stop piden sudo.
+# ═══════════════════════════════════════════════════════════════
+
+# Sin `set -e`: este script es un gestor de servicios y muchas
+# operaciones (pkill, iptables -F, kill) devuelven != 0 de forma
+# esperada. Los errores fatales se manejan explícitamente con die().
+set -uo pipefail
+
+# ══════════ CONFIG ══════════
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="${SCRIPT_DIR}/backend"
+FRONTEND_ROOT="${SCRIPT_DIR}/frontend"       # contiene wfaudit.html
+REACT_DIR="${FRONTEND_ROOT}/React"           # app React + Vite
+VENV_DIR="${SCRIPT_DIR}/.venv"
+LOG_DIR="${SCRIPT_DIR}/logs"
+PID_DIR="${SCRIPT_DIR}/.pids"
+
+BACKEND_HOST="${WFAUDIT_HOST:-0.0.0.0}"
+BACKEND_PORT="${WFAUDIT_PORT:-8000}"
+FRONTEND_PORT="${WFAUDIT_FRONTEND_PORT:-5173}"
+STATIC_PORT="${WFAUDIT_STATIC_PORT:-8080}"
+# WFAUDIT_STATIC=0 desactiva la interfaz HTML standalone
+SERVE_STATIC="${WFAUDIT_STATIC:-1}"
+
+BACKEND_LOG="${LOG_DIR}/backend.log"
+FRONTEND_LOG="${LOG_DIR}/frontend.log"
+STATIC_LOG="${LOG_DIR}/static.log"
+BACKEND_PID="${PID_DIR}/backend.pid"
+FRONTEND_PID="${PID_DIR}/frontend.pid"
+STATIC_PID="${PID_DIR}/static.pid"
+
+# Usuario que invocó sudo (para no dejar ficheros root-owned)
+INVOKER="${SUDO_USER:-}"
+
+# ══════════ HELPERS ══════════
+info()  { echo "[INFO]  $*"; }
+ok()    { echo "[OK]    $*"; }
+warn()  { echo "[WARN]  $*"; }
+err()   { echo "[ERROR] $*" >&2; }
+step()  { echo; echo "▶ $*"; }
+hr()    { echo "─────────────────────────────────────────────"; }
+die()   { err "$*"; exit 1; }
+
+banner() {
+    echo
+    echo "   ╦ ╦╔═╗╔═╗╦ ╦╔╦╗╦╔╦╗"
+    echo "   ║║║╠╣ ╠═╣║ ║ ║║║ ║ "
+    echo "   ╚╩╝╚  ╩ ╩╚═╝═╩╝╩ ╩ "
+    echo "   WiFi Security Audit Platform"
+    echo
+}
+
+require_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        err "El comando '$1' requiere privilegios root."
+        err "Reejecuta con:  sudo ./wfaudit $1"
+        exit 1
+    fi
+}
+
+ensure_dirs() { mkdir -p "$LOG_DIR" "$PID_DIR"; }
+
+# Ejecuta un comando como el usuario que invocó sudo (si aplica).
+# Así el node_modules / caché de Vite no quedan como root.
+as_invoker() {
+    if [ -n "$INVOKER" ]; then
+        sudo -u "$INVOKER" -H "$@"
+    else
+        "$@"
+    fi
+}
+
+check_distro() {
+    if [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        DISTRO="${ID:-unknown}"
+    else
+        DISTRO="unknown"
+    fi
+}
+
+is_running() {
+    local pidfile="$1"
+    [ -f "$pidfile" ] || return 1
+    local pid; pid="$(cat "$pidfile" 2>/dev/null)"
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+# Lanza un servicio en su propia sesión (setsid) y registra el PID del
+# LÍDER real de forma fiable: el proceso escribe su propio $$ en el pidfile
+# antes de exec. Así el PID es correcto haga setsid fork o no, y como el
+# líder es jefe de grupo (PGID==PID) el group-kill de stop_service es seguro.
+#   $1 pidfile  $2 logfile  $3 workdir  $4 runas(root|usuario)  $5.. comando
+launch() {
+    local pidfile="$1" logfile="$2" workdir="$3" runas="$4"; shift 4
+    rm -f "$pidfile"
+    local prefix=""
+    [ "$runas" != "root" ] && [ -n "$runas" ] && prefix="sudo -u $runas -H "
+    setsid bash -c "echo \$\$ > '$pidfile'; cd '$workdir' && exec ${prefix}$*" \
+        >"$logfile" 2>&1 &
+    local n=0
+    while [ ! -s "$pidfile" ] && [ "$n" -lt 20 ]; do sleep 0.1; n=$((n + 1)); done
+}
+
+# Para un servicio a partir de su pidfile.
+#   $1 pidfile   $2 nombre legible   $3 graceful(true/false)
+stop_service() {
+    local pidfile="$1" name="$2" graceful="${3:-true}"
+    is_running "$pidfile" || { rm -f "$pidfile"; return 1; }
+
+    local pid; pid="$(cat "$pidfile")"
+    info "Deteniendo $name (PID $pid)..."
+
+    # TERM al grupo de procesos (setsid ⇒ PGID == PID) con fallback al PID
+    kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
+
+    # Espera de cortesía: el backend usa este tiempo para su propio cleanup
+    local waited=0 limit=6
+    [ "$graceful" = true ] && limit=8
+    while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$limit" ]; do
+        sleep 1; waited=$((waited + 1)); printf "."
+    done
+    [ "$waited" -gt 0 ] && echo
+
+    if kill -0 "$pid" 2>/dev/null; then
+        warn "$name no cerró a tiempo, forzando (SIGKILL)"
+        kill -KILL "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
+    fi
+    rm -f "$pidfile"
+    ok "$name detenido"
+    return 0
+}
+
+# ══════════ INSTALL ══════════
+cmd_install() {
+    banner
+    require_root install
+    ensure_dirs
+    check_distro
+
+    step "Dependencias del sistema"
+    info "Distribución detectada: $DISTRO"
+
+    local SYSTEM_PKGS=(
+        # Python
+        python3 python3-pip python3-venv python3-dev
+        # Core auditoría WiFi
+        aircrack-ng hcxdumptool hcxtools hashcat
+        # Red
+        nmap tcpdump tshark
+        # Ataques
+        hostapd dnsmasq macchanger dsniff arping mitmproxy
+        # Utilidades de sistema
+        iptables iproute2 net-tools wireless-tools iw openssl curl
+        # Build (compilación de dependencias Python nativas)
+        build-essential libssl-dev libffi-dev
+        # Opcionales pero recomendadas
+        freeradius reaver bully crunch
+    )
+
+    case "$DISTRO" in
+        kali|debian|ubuntu|parrot|raspbian|linuxmint|pop)
+            info "Instalando paquetes con apt..."
+            apt-get update -qq
+            for pkg in "${SYSTEM_PKGS[@]}"; do
+                if dpkg -s "$pkg" >/dev/null 2>&1; then
+                    echo "  ✓ $pkg ya instalado"
+                else
+                    echo "  → Instalando $pkg..."
+                    apt-get install -y -qq "$pkg" 2>/dev/null || warn "$pkg falló (puede no estar disponible en esta distro)"
+                fi
+            done
+            ;;
+        arch|manjaro|endeavouros|blackarch)
+            info "Instalando paquetes con pacman..."
+            pacman -Sy --noconfirm --needed "${SYSTEM_PKGS[@]}" 2>/dev/null || warn "Algunos paquetes pueden haber fallado"
+            ;;
+        fedora|rhel|centos|rocky|almalinux)
+            info "Instalando paquetes con dnf..."
+            dnf install -y "${SYSTEM_PKGS[@]}" 2>/dev/null || warn "Algunos paquetes pueden haber fallado"
+            ;;
+        *)
+            warn "Distribución no reconocida: $DISTRO"
+            warn "Instala manualmente estos paquetes:"
+            printf '  - %s\n' "${SYSTEM_PKGS[@]}"
+            ;;
+    esac
+    ok "Dependencias del sistema procesadas"
+
+    # ─── Backend — venv Python ───
+    step "Entorno Python del backend"
+    [ -d "$BACKEND_DIR" ] || die "No existe el directorio backend: $BACKEND_DIR"
+
+    if [ ! -d "$VENV_DIR" ]; then
+        info "Creando virtual environment en $VENV_DIR"
+        python3 -m venv "$VENV_DIR" || die "No se pudo crear el venv"
+    else
+        info "El virtual environment ya existe"
+    fi
+
+    info "Actualizando pip..."
+    "$VENV_DIR/bin/pip" install --upgrade pip wheel setuptools >/dev/null || warn "No se pudo actualizar pip"
+
+    if [ -f "$BACKEND_DIR/requirements.txt" ]; then
+        info "Instalando dependencias Python (requirements.txt)..."
+        "$VENV_DIR/bin/pip" install -r "$BACKEND_DIR/requirements.txt" \
+            || die "Fallo instalando requirements.txt — revisa el error de pip arriba"
+    else
+        warn "No hay requirements.txt — instalando dependencias core"
+        "$VENV_DIR/bin/pip" install \
+            fastapi "uvicorn[standard]" pydantic pydantic-settings \
+            python-multipart aiofiles psutil mitmproxy \
+            || die "Fallo instalando dependencias core"
+    fi
+
+    # El backend corre como root pero el usuario debe poder leer el venv
+    if [ -n "$INVOKER" ]; then
+        info "Ajustando propietario del .venv para $INVOKER..."
+        chown -R "$INVOKER":"$INVOKER" "$VENV_DIR"
+    fi
+    ok "Entorno del backend listo"
+
+    # ─── Frontend — Node + npm ───
+    step "Entorno Node del frontend (React)"
+    if [ ! -f "$REACT_DIR/package.json" ]; then
+        warn "No se encontró $REACT_DIR/package.json — se omite el frontend React"
+    else
+        if ! command -v node >/dev/null 2>&1; then
+            info "Node.js no encontrado — instalando vía NodeSource (20.x)..."
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || warn "Setup de NodeSource falló"
+            apt-get install -y nodejs 2>/dev/null || warn "No se pudo instalar nodejs automáticamente"
+        else
+            info "Node.js encontrado: $(node --version)"
+        fi
+
+        if command -v npm >/dev/null 2>&1; then
+            info "Instalando paquetes npm (esto puede tardar)..."
+            ( cd "$REACT_DIR" && as_invoker npm install ) || warn "npm install devolvió errores — revisa $REACT_DIR"
+            ok "Entorno del frontend React listo"
+        else
+            warn "npm no disponible — instala Node.js manualmente y ejecuta 'npm install' en $REACT_DIR"
+        fi
+    fi
+
+    # ─── Certificado CA de mitmproxy ───
+    step "Certificado CA de mitmproxy"
+    info "Generando CA (modo Full Interception del MITM)..."
+    if [ -x "$VENV_DIR/bin/mitmdump" ]; then
+        timeout 5 "$VENV_DIR/bin/mitmdump" --listen-port 18888 >/dev/null 2>&1 || true
+    elif command -v mitmdump >/dev/null 2>&1; then
+        timeout 5 mitmdump --listen-port 18888 >/dev/null 2>&1 || true
+    fi
+
+    local target_home="$HOME"
+    [ -n "$INVOKER" ] && target_home="$(getent passwd "$INVOKER" | cut -d: -f6)"
+    if [ -f "${target_home}/.mitmproxy/mitmproxy-ca-cert.pem" ]; then
+        ok "CA generada en ${target_home}/.mitmproxy/"
+    else
+        warn "CA no generada — ejecuta 'mitmdump' una vez manualmente para crearla"
+    fi
+
+    hr
+    echo "✓ Instalación completa"
+    echo
+    echo "Arranca la plataforma con:  sudo ./wfaudit start"
+    hr
+}
+
+# ══════════ START ══════════
+cmd_start() {
+    banner
+    require_root start
+    ensure_dirs
+
+    if is_running "$BACKEND_PID"; then
+        err "WFAudit ya está corriendo. Usa './wfaudit stop' primero."
+        cmd_status
+        exit 1
+    fi
+
+    [ -x "$VENV_DIR/bin/uvicorn" ] || die "Virtual environment no encontrado. Ejecuta './wfaudit install' primero."
+
+    # ─── Backend ───
+    step "Arrancando Backend (FastAPI)"
+    launch "$BACKEND_PID" "$BACKEND_LOG" "$BACKEND_DIR" root \
+        "$VENV_DIR/bin/uvicorn" app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT"
+
+    info "Esperando a que el backend responda..."
+    local up=false
+    for _ in $(seq 1 15); do
+        sleep 1
+        if curl -sf "http://localhost:${BACKEND_PORT}/system/health" >/dev/null 2>&1; then
+            up=true; break
+        fi
+        printf "."
+    done
+    echo
+    if [ "$up" = true ]; then
+        ok "Backend arriba (PID $(cat "$BACKEND_PID"))"
+    else
+        err "El backend no arrancó. Últimas líneas de $BACKEND_LOG:"
+        tail -n 20 "$BACKEND_LOG" 2>/dev/null
+        stop_service "$BACKEND_PID" "backend" false
+        exit 1
+    fi
+
+    # ─── Frontend React (Vite) ───
+    step "Arrancando Frontend React (Vite)"
+    if [ -f "$REACT_DIR/package.json" ] && command -v npm >/dev/null 2>&1; then
+        launch "$FRONTEND_PID" "$FRONTEND_LOG" "$REACT_DIR" "$INVOKER" \
+            npm run dev -- --host --port "$FRONTEND_PORT"
+        info "Esperando a Vite (la primera compilación puede tardar)..."
+        for _ in $(seq 1 20); do
+            sleep 1
+            curl -sf "http://localhost:${FRONTEND_PORT}" >/dev/null 2>&1 && break
+            printf "."
+        done
+        echo
+        if curl -sf "http://localhost:${FRONTEND_PORT}" >/dev/null 2>&1; then
+            ok "Frontend React arriba (PID $(cat "$FRONTEND_PID"))"
+        else
+            warn "Vite todavía compilando — revisa $FRONTEND_LOG en unos segundos"
+        fi
+    else
+        warn "Frontend React no disponible (falta package.json o npm) — se omite"
+    fi
+
+    # ─── Interfaz HTML standalone ───
+    if [ "$SERVE_STATIC" = "1" ] && [ -f "$FRONTEND_ROOT/wfaudit.html" ]; then
+        step "Sirviendo interfaz HTML standalone"
+        launch "$STATIC_PID" "$STATIC_LOG" "$FRONTEND_ROOT" "$INVOKER" \
+            python3 -m http.server "$STATIC_PORT" --bind 0.0.0.0
+        sleep 1
+        is_running "$STATIC_PID" && ok "Interfaz standalone arriba (PID $(cat "$STATIC_PID"))" \
+                                 || warn "No se pudo servir la interfaz standalone (revisa $STATIC_LOG)"
+    fi
+
+    hr
+    echo "✓ WFAudit en marcha"
+    echo
+    echo "  Backend / API .... http://localhost:${BACKEND_PORT}        (docs Swagger en /docs)"
+    is_running "$FRONTEND_PID" && \
+    echo "  Interfaz React ... http://localhost:${FRONTEND_PORT}"
+    is_running "$STATIC_PID" && \
+    echo "  Interfaz HTML .... http://localhost:${STATIC_PORT}/wfaudit.html"
+    echo
+    echo "  Logs:  ./wfaudit logs        Estado: ./wfaudit status"
+    echo "  Parar: sudo ./wfaudit stop"
+    hr
+}
+
+# ══════════ STOP ══════════
+cmd_stop() {
+    require_root stop
+    ensure_dirs
+    step "Deteniendo WFAudit"
+
+    local stopped=false
+    stop_service "$STATIC_PID"   "interfaz HTML" false && stopped=true
+    stop_service "$FRONTEND_PID" "frontend React" false && stopped=true
+    # Backend con parada grácil: uvicorn ejecuta su cleanup (process_manager)
+    stop_service "$BACKEND_PID"  "backend" true && stopped=true
+
+    # Barrido de procesos de ataque que pudieran haber quedado colgados
+    info "Limpiando procesos de ataque residuales..."
+    for p in arpspoof mitmdump mitm_stealth_monitor hostapd dnsmasq \
+             airodump-ng aireplay-ng hcxdumptool; do
+        pkill -f "$p" 2>/dev/null || true
+    done
+    # Restos de Vite/uvicorn en los puertos configurados
+    pkill -f "vite.*${FRONTEND_PORT}" 2>/dev/null || true
+    pkill -f "uvicorn.*app.main" 2>/dev/null || true
+
+    # Restaurar el estado de la red (crítico tras MITM / Evil Twin)
+    info "Restaurando iptables e IP forwarding..."
+    iptables -t nat -F 2>/dev/null || true
+    iptables -F FORWARD 2>/dev/null || true
+    sysctl -w net.ipv4.ip_forward=0 >/dev/null 2>&1 || true
+
+    if [ "$stopped" = true ]; then
+        ok "Todos los servicios detenidos y red restaurada"
+    else
+        warn "WFAudit no estaba corriendo (limpieza de red aplicada igualmente)"
+    fi
+    echo
+    echo "Nota: si pusiste una tarjeta en modo monitor, airmon-ng pudo parar"
+    echo "NetworkManager. Si te quedaste sin WiFi: sudo systemctl restart NetworkManager"
+}
+
+# ══════════ STATUS ══════════
+cmd_status() {
+    banner
+    step "Estado de los servicios"
+
+    if is_running "$BACKEND_PID"; then
+        echo "  Backend ....... ● RUNNING   PID $(cat "$BACKEND_PID")   http://localhost:${BACKEND_PORT}"
+    else
+        echo "  Backend ....... ○ STOPPED"
+    fi
+    if is_running "$FRONTEND_PID"; then
+        echo "  React (Vite) .. ● RUNNING   PID $(cat "$FRONTEND_PID")   http://localhost:${FRONTEND_PORT}"
+    else
+        echo "  React (Vite) .. ○ STOPPED"
+    fi
+    if is_running "$STATIC_PID"; then
+        echo "  HTML standalone ● RUNNING   PID $(cat "$STATIC_PID")   http://localhost:${STATIC_PORT}/wfaudit.html"
+    else
+        echo "  HTML standalone ○ STOPPED"
+    fi
+
+    if is_running "$BACKEND_PID"; then
+        step "Salud del backend"
+        if curl -sf "http://localhost:${BACKEND_PORT}/system/health" >/dev/null 2>&1; then
+            echo "  Health ..... ✓ OK"
+        else
+            echo "  Health ..... ✗ NO RESPONDE"
+        fi
+        local mitm et
+        mitm="$(curl -sf "http://localhost:${BACKEND_PORT}/attacks/mitm/status" 2>/dev/null || echo '')"
+        et="$(curl -sf "http://localhost:${BACKEND_PORT}/attacks/evil-twin/status" 2>/dev/null || echo '')"
+        echo "$mitm" | grep -q '"active":true' && echo "  MITM ....... ● ACTIVO"
+        echo "$et"   | grep -q '"active":true' && echo "  Evil Twin .. ● ACTIVO"
+    fi
+    hr
+}
+
+# ══════════ LOGS ══════════
+cmd_logs() {
+    step "Logs en tiempo real (Ctrl+C para salir)"
+    local files=()
+    [ -f "$BACKEND_LOG" ]  && files+=("$BACKEND_LOG")
+    [ -f "$FRONTEND_LOG" ] && files+=("$FRONTEND_LOG")
+    [ -f "$STATIC_LOG" ]   && files+=("$STATIC_LOG")
+    [ ${#files[@]} -eq 0 ] && die "No hay logs. ¿Está WFAudit arrancado?"
+
+    if command -v multitail >/dev/null 2>&1; then
+        multitail "${files[@]}"
+    else
+        tail -f "${files[@]}"
+    fi
+}
+
+# ══════════ PREFLIGHT ══════════
+cmd_preflight() {
+    step "Verificación de herramientas del sistema"
+    local tools=(aircrack-ng airodump-ng aireplay-ng airmon-ng \
+                 hcxdumptool hcxpcapngtool hashcat nmap hostapd dnsmasq \
+                 macchanger arpspoof mitmdump tshark tcpdump iptables iw)
+    local missing=()
+    for t in "${tools[@]}"; do
+        if command -v "$t" >/dev/null 2>&1; then
+            printf "  ✓ %-16s %s\n" "$t" "$(command -v "$t")"
+        else
+            printf "  ✗ %-16s (falta)\n" "$t"
+            missing+=("$t")
+        fi
+    done
+    echo
+    if [ ${#missing[@]} -eq 0 ]; then
+        ok "Todas las herramientas presentes"
+    else
+        warn "Faltan ${#missing[@]}: ${missing[*]}"
+        warn "Ejecuta 'sudo ./wfaudit install' para instalarlas"
+    fi
+    if is_running "$BACKEND_PID"; then
+        echo
+        info "El backend expone un preflight más detallado en:"
+        echo "  curl http://localhost:${BACKEND_PORT}/system/preflight"
+    fi
+}
+
+# ══════════ CLEAN ══════════
+cmd_clean() {
+    warn "Esto eliminará: .venv, frontend/React/node_modules, logs/ y .pids/"
+    read -r -p "¿Continuar? [y/N] " reply
+    case "$reply" in
+        [yY]|[yY][eE][sS]) ;;
+        *) info "Cancelado"; exit 0 ;;
+    esac
+
+    if is_running "$BACKEND_PID" || is_running "$FRONTEND_PID" || is_running "$STATIC_PID"; then
+        info "Parando servicios primero..."
+        require_root clean
+        cmd_stop
+    fi
+
+    step "Limpiando"
+    [ -d "$VENV_DIR" ]               && rm -rf "$VENV_DIR"               && ok "Eliminado .venv"
+    [ -d "$REACT_DIR/node_modules" ] && rm -rf "$REACT_DIR/node_modules" && ok "Eliminado node_modules"
+    [ -d "$LOG_DIR" ]                && rm -rf "$LOG_DIR"                && ok "Eliminado logs/"
+    [ -d "$PID_DIR" ]                && rm -rf "$PID_DIR"                && ok "Eliminado .pids/"
+    ok "Limpieza completa"
+}
+
+# ══════════ HELP ══════════
+cmd_help() {
+    banner
+    cat <<'HELPEOF'
+USO
+    ./wfaudit <comando>
+
+COMANDOS
+    install    Instala paquetes del sistema, venv Python y módulos Node
+               Requiere root:  sudo ./wfaudit install
+    start      Arranca backend (FastAPI) + interfaz React + interfaz HTML
+               Requiere root:  sudo ./wfaudit start
+    stop       Para todo, mata ataques residuales y restaura la red (root)
+    restart    stop + start
+    status     Estado de los servicios y ataques activos
+    logs       Tail de los logs en tiempo real
+    preflight  Comprueba que las herramientas del sistema estén instaladas
+    clean      Borra .venv, node_modules, logs y .pids (reset completo)
+    help       Esta ayuda
+
+VARIABLES DE ENTORNO
+    WFAUDIT_HOST           Host del backend        (default: 0.0.0.0)
+    WFAUDIT_PORT           Puerto del backend      (default: 8000)
+    WFAUDIT_FRONTEND_PORT  Puerto de React/Vite    (default: 5173)
+    WFAUDIT_STATIC_PORT    Puerto interfaz HTML    (default: 8080)
+    WFAUDIT_STATIC=0       No servir la interfaz HTML standalone
+
+PRIMER USO
+    sudo ./wfaudit install        # Setup único
+    sudo ./wfaudit start          # Arrancar
+    #  → http://localhost:5173            (interfaz React)
+    #  → http://localhost:8080/wfaudit.html  (interfaz standalone)
+    sudo ./wfaudit stop           # Al terminar
+
+AVISO LEGAL
+    Úsalo solo en redes propias o con autorización escrita del propietario.
+    El uso no autorizado es delito en la mayoría de jurisdicciones.
+HELPEOF
+}
+
+# ══════════ DISPATCH ══════════
+# Solo despacha al ejecutarse directamente; si se hace `source wfaudit`
+# (p.ej. en tests) las funciones quedan disponibles sin efectos.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    case "${1:-help}" in
+        install)        cmd_install ;;
+        start)          cmd_start ;;
+        stop)           cmd_stop ;;
+        restart)        cmd_stop; sleep 1; cmd_start ;;
+        status)         cmd_status ;;
+        logs)           cmd_logs ;;
+        preflight)      cmd_preflight ;;
+        clean)          cmd_clean ;;
+        help|--help|-h) cmd_help ;;
+        *) err "Comando desconocido: $1"; echo; cmd_help; exit 1 ;;
+    esac
+fi
