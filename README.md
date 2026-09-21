@@ -4,12 +4,12 @@
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
   <img src="https://img.shields.io/badge/python-3.11%E2%80%933.14-blue.svg" alt="Python 3.11–3.14">
   <img src="https://img.shields.io/badge/backend-FastAPI-009688.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/frontend-React%2019%20%2B%20HTML-61dafb.svg" alt="React 19 + HTML">
+  <img src="https://img.shields.io/badge/frontend-single--file%20HTML-61dafb.svg" alt="Single-file HTML UI">
   <img src="https://img.shields.io/badge/platform-Linux-000000.svg" alt="Platform: Linux">
   <img src="https://img.shields.io/badge/deploy-one%20command-ff8c42.svg" alt="One-command deploy">
 </p>
 
-**WFAudit turns the entire zoo of command-line wireless-security tools — `airodump-ng`, `aireplay-ng`, `hcxdumptool`, `hashcat`, `nmap`, `hostapd`, `arpspoof`, `mitmdump` and friends — into a single REST API with two web interfaces.**
+**WFAudit turns the entire zoo of command-line wireless-security tools — `airodump-ng`, `aireplay-ng`, `hcxdumptool`, `hashcat`, `nmap`, `hostapd`, `arpspoof`, `mitmdump` and friends — into a single REST API with a clean, zero-dependency web interface.**
 
 Instead of juggling a dozen terminals and hand-parsing incompatible outputs, you drive an entire WiFi engagement — reconnaissance, handshake capture, offline cracking, wordlist generation, MITM, Evil Twin, WPA3/Enterprise attacks and internal network recon — from one clean UI or from automation scripts. One command installs it, one command runs it, one command tears it down and restores your network.
 
@@ -49,7 +49,7 @@ Instead of juggling a dozen terminals and hand-parsing incompatible outputs, you
 ## Highlights
 
 - 🧭 **One API, many tools** — 75+ REST endpoints across 9 modules wrapping the industry-standard wireless toolkit, with auto-generated Swagger docs at `/docs`.
-- 🖥️ **Two web UIs** — a full-featured **React** app *and* a zero-dependency **single-file HTML** console with a built-in 13-section help manual. Pick whichever you like.
+- 🖥️ **Zero-dependency web UI** — a single self-contained **HTML** file (no build, no `node_modules`) with a built-in 13-section help manual, contextual tooltips and universal input persistence across tabs.
 - 🚀 **One-command deploy** — `sudo ./wfaudit install` sets up everything; `sudo ./wfaudit start` / `stop` runs and tears it down cleanly.
 - 🧱 **Clean architecture** — three layers (HTTP routers → business services → tool utilities), fully async, easy to extend.
 - 🔒 **Safe teardown** — `stop` kills residual attack processes and restores `iptables` / IP-forwarding so your machine goes back to normal.
@@ -80,10 +80,10 @@ WFAudit is organized into modules. Each is exposed both in the web UIs and as RE
 
 ```
 ┌────────────────────────┐        ┌──────────────────────────────────────┐
-│  Web UIs / scripts      │  HTTP  │           FastAPI backend (root)      │
-│  • React app  :5173     │ ─JSON─▶│  routers ─▶ services ─▶ system tools  │
-│  • HTML app   :8080     │        │  (HTTP)     (orchestration)  (airodump │
-│  • Swagger    :8000/docs│        │                               hashcat, │
+│  Web UI / scripts       │  HTTP  │           FastAPI backend (root)      │
+│  • Web UI     :8080     │ ─JSON─▶│  routers ─▶ services ─▶ system tools  │
+│  • Swagger    :8000/docs│        │  (HTTP)     (orchestration)  (airodump │
+│                         │        │                               hashcat, │
 └────────────────────────┘        │                               nmap …)  │
                                    └──────────────────────────────────────┘
 ```
@@ -103,10 +103,10 @@ Everything below is what you need to install, run, configure and tear down WFAud
 | **OS** | **Linux only** (needs monitor mode, `iptables`, raw sockets). **Kali** or **Parrot OS** recommended — the tooling ships preinstalled. Debian/Ubuntu/Arch/Fedora work too. |
 | **Privileges** | The backend **must run as root**. `install`, `start`, `stop`, `restart` require `sudo`. `status`, `logs`, `preflight`, `help` do **not**. |
 | **Python** | 3.11+ (tested up to **3.14**). Created as a project-local `.venv` by the installer. |
-| **Node.js** | 20.x — only needed for the React UI; the installer sets it up via NodeSource. The HTML UI needs nothing. |
+| **Node.js** | Not required. The web UI is a single static HTML file served by Python's built-in HTTP server — no build step, no `node_modules`. |
 | **WiFi adapter** | At least **one** adapter with **monitor mode + packet injection**; **two** for Evil Twin / Enterprise / AP-Less (one AP, one monitor). |
 | **GPU** *(optional)* | Any CUDA/OpenCL GPU accelerates `hashcat` cracking by 100–1000×. |
-| **Disk** | ~2–3 GB for system packages + venv + `node_modules`. Captures/wordlists grow with use. |
+| **Disk** | ~1–2 GB for system packages + the Python venv. Captures/wordlists grow with use. |
 
 **Supported distributions** (auto-detected by the installer):
 
@@ -134,16 +134,15 @@ Everything below is what you need to install, run, configure and tear down WFAud
 git clone https://github.com/andermonreal/WFAudit.git
 cd WFAudit
 
-# 2. Install everything (system packages + Python venv + Node modules + mitmproxy CA)
+# 2. Install everything (system packages + Python venv + mitmproxy CA)
 sudo ./wfaudit install
 
-# 3. Start backend + both web interfaces
+# 3. Start backend + web interface
 sudo ./wfaudit start
 
-# 4. Open one of:
-#    http://localhost:5173              → React UI
-#    http://localhost:8080/wfaudit.html → standalone HTML UI
-#    http://localhost:8000/docs         → Swagger API docs
+# 4. Open:
+#    http://localhost:8080/       → web UI
+#    http://localhost:8000/docs   → Swagger API docs
 
 # 5. When you're done — stops everything and restores your network
 sudo ./wfaudit stop
@@ -175,7 +174,7 @@ The installer is **idempotent** (safe to re-run) and **distro-aware**. In order,
 3. **Creates the Python venv** at `./.venv`, upgrades `pip`/`wheel`/`setuptools`, and installs `backend/requirements.txt`:
    `fastapi` · `uvicorn` · `pydantic` · `pydantic-settings` · `python-multipart` · `websockets` · `aiofiles` · `psutil` · `python-nmap` · `scapy` · `netifaces2` · `mitmproxy`.
    The venv is then `chown`ed back to the invoking user so it stays readable without `sudo`.
-4. **Sets up the React frontend** — installs Node.js 20.x via NodeSource if missing, then runs `npm install` in `frontend/React/` **as your normal user** (not root).
+4. **Checks the web UI** — `frontend/index.html` is a single static file with no build step or dependencies, so there's nothing to install.
 5. **Generates the mitmproxy CA** used by MITM *Full* mode, at `~/.mitmproxy/` (the invoking user's home).
 
 When it finishes you'll see `✓ Instalación completa`. If anything is missing later, run [`./wfaudit preflight`](#9-verifying-the-deployment).
@@ -186,18 +185,16 @@ When it finishes you'll see `✓ Instalación completa`. If anything is missing 
 sudo ./wfaudit start
 ```
 
-`start` launches **three** services and waits until the backend answers its health check. Exact processes:
+`start` launches **two** services and waits until the backend answers its health check. Exact processes:
 
 | Service | Command | Runs as | Port | Working dir | Log | PID file |
 |---|---|:---:|:---:|---|---|---|
 | **Backend** (FastAPI) | `.venv/bin/uvicorn app.main:app --host $WFAUDIT_HOST --port $WFAUDIT_PORT` | **root** | `8000` | `backend/` | `logs/backend.log` | `.pids/backend.pid` |
-| **React** (Vite) | `npm run dev -- --host --port $WFAUDIT_FRONTEND_PORT` | `$SUDO_USER` | `5173` | `frontend/React/` | `logs/frontend.log` | `.pids/frontend.pid` |
-| **HTML** (static) | `python3 -m http.server $WFAUDIT_STATIC_PORT --bind 0.0.0.0` | `$SUDO_USER` | `8080` | `frontend/` | `logs/static.log` | `.pids/static.pid` |
+| **Web UI** (static) | `python3 -m http.server $WFAUDIT_FRONTEND_PORT --bind 0.0.0.0` | `$SUDO_USER` | `8080` | `frontend/` | `logs/frontend.log` | `.pids/frontend.pid` |
 
-- The backend is the only service that needs root; the two UIs are dropped to your normal user.
+- The backend is the only service that needs root; the web UI is dropped to your normal user.
 - `start` refuses to run if a backend PID is already active — use `stop` (or `restart`) first.
-- If the React frontend can't be found (no `package.json`/`npm`) or the HTML UI is disabled (`WFAUDIT_STATIC=0`), those services are skipped and the rest still start.
-- The first Vite build can take 20–30 s; the URL may 404 briefly until it's ready.
+- The web UI serves `frontend/index.html` at the root path, so `http://localhost:8080/` loads it directly.
 
 ### 5. The `wfaudit` control script
 
@@ -205,14 +202,14 @@ A single script manages the whole platform:
 
 | Command | Root? | Description |
 |---|:---:|---|
-| `./wfaudit install` | ✔ | Install system packages, the Python venv, Node modules and the mitmproxy CA. |
-| `./wfaudit start` | ✔ | Start the backend (FastAPI) and both web interfaces. |
+| `./wfaudit install` | ✔ | Install system packages, the Python venv and the mitmproxy CA. |
+| `./wfaudit start` | ✔ | Start the backend (FastAPI) and the web interface. |
 | `./wfaudit stop` | ✔ | Stop everything, kill residual attack processes, restore `iptables` / IP-forwarding. |
 | `./wfaudit restart` | ✔ | `stop` + `start`. |
 | `./wfaudit status` | — | Show per-service status (PID + URL) and any active MITM / Evil Twin. |
-| `./wfaudit logs` | — | Tail backend + frontend + static logs in real time (`multitail` if available, else `tail -f`). |
+| `./wfaudit logs` | — | Tail backend + web-UI logs in real time (`multitail` if available, else `tail -f`). |
 | `./wfaudit preflight` | — | Check that the required system tools are installed and print their paths. |
-| `./wfaudit clean` | — | Remove `.venv`, `node_modules`, `logs/` and `.pids/` (full reset; prompts for confirmation). |
+| `./wfaudit clean` | — | Remove `.venv`, `logs/` and `.pids/` (full reset; prompts for confirmation). |
 | `./wfaudit help` | — | Show usage. |
 
 ### 6. Configuration (environment variables)
@@ -223,16 +220,14 @@ Override any of these on the command line before the script:
 |---|---|---|
 | `WFAUDIT_HOST` | `0.0.0.0` | Backend bind host |
 | `WFAUDIT_PORT` | `8000` | Backend (FastAPI) port |
-| `WFAUDIT_FRONTEND_PORT` | `5173` | React (Vite) port |
-| `WFAUDIT_STATIC_PORT` | `8080` | Standalone HTML port |
-| `WFAUDIT_STATIC` | `1` | Set to `0` to skip serving the standalone HTML UI |
+| `WFAUDIT_FRONTEND_PORT` | `8080` | Web-UI port (static HTML server) |
 
 ```bash
-# Example: custom ports, no static UI
-WFAUDIT_PORT=9000 WFAUDIT_FRONTEND_PORT=3000 WFAUDIT_STATIC=0 sudo ./wfaudit start
+# Example: custom ports
+WFAUDIT_PORT=9000 WFAUDIT_FRONTEND_PORT=3000 sudo ./wfaudit start
 ```
 
-> ℹ️ If you change `WFAUDIT_PORT`, the web UIs still default to `http://localhost:8000`. Point the React app's `API_BASE` / the HTML console's `API` constant at your custom host\:port, or reverse-proxy `:8000` accordingly.
+> ℹ️ If you change `WFAUDIT_PORT`, the web UI still expects the backend at `http://localhost:8000`. Point the HTML console's `API` constant at your custom host\:port, or reverse-proxy `:8000` accordingly.
 
 The **backend** itself reads settings from `backend/app/config.py` (via `pydantic-settings`), which also accepts an optional `backend/.env` file. Notable settings include the data directories (below) — override e.g. `REPORTS_DIR=/path` as an environment variable if you want captures/reports stored elsewhere.
 
@@ -241,9 +236,8 @@ The **backend** itself reads settings from `backend/app/config.py` (via `pydanti
 ```
 WFAudit/
 ├── .venv/                    ← Python virtual environment (created by install)
-├── logs/                     ← backend.log · frontend.log · static.log
-├── .pids/                    ← backend.pid · frontend.pid · static.pid
-├── frontend/React/node_modules/
+├── logs/                     ← backend.log · frontend.log
+├── .pids/                    ← backend.pid · frontend.pid
 └── backend/data/             ← runtime data (created on first use)
     ├── captures/   handshakes/   pmkid/
     ├── wordlists/  reports/      logs/
@@ -252,13 +246,13 @@ WFAudit/
 ~/.mitmproxy/                  ← mitmproxy CA (pem/cer/p12) for MITM Full mode
 ```
 
-`./wfaudit clean` removes `.venv`, `node_modules`, `logs/` and `.pids/`. It does **not** delete `backend/data/` (your captures, reports and wordlists) or the CA — remove those by hand if you really want a clean slate.
+`./wfaudit clean` removes `.venv`, `logs/` and `.pids/`. It does **not** delete `backend/data/` (your captures, reports and wordlists) or the CA — remove those by hand if you really want a clean slate.
 
 ### 8. Network teardown & safety
 
 `sudo ./wfaudit stop` does more than kill services — it **restores your machine's network state**, which is critical after MITM or Evil Twin:
 
-1. Gracefully stops the static, React and backend services (the backend runs its own cleanup on shutdown).
+1. Gracefully stops the web-UI and backend services (the backend runs its own cleanup on shutdown).
 2. Sweeps residual attack processes: `arpspoof`, `mitmdump`, `mitm_stealth_monitor`, `hostapd`, `dnsmasq`, `airodump-ng`, `aireplay-ng`, `hcxdumptool`.
 3. Flushes firewall rules: `iptables -t nat -F`, `iptables -F FORWARD`.
 4. Disables IP forwarding: `net.ipv4.ip_forward=0`.
@@ -280,25 +274,24 @@ curl localhost:8000/system/preflight   # detailed JSON: tools, root, system info
 
 By default every service binds to `0.0.0.0`, so **it is reachable from your whole LAN**, and the API is unauthenticated. That's convenient on an isolated lab network but risky elsewhere. For anything but a trusted local setup:
 
-- Bind the backend to localhost only: `WFAUDIT_HOST=127.0.0.1 sudo ./wfaudit start`, and reach the UIs over an SSH tunnel (`ssh -L 5173:localhost:5173 -L 8000:localhost:8000 …`).
-- Or firewall ports `8000`, `5173`, `8080` to trusted hosts.
+- Bind the backend to localhost only: `WFAUDIT_HOST=127.0.0.1 sudo ./wfaudit start`, and reach the UI over an SSH tunnel (`ssh -L 8080:localhost:8080 -L 8000:localhost:8000 …`).
+- Or firewall ports `8000` and `8080` to trusted hosts.
 - Never expose WFAudit directly to the internet — it drives offensive tooling as root with no auth.
 
 ---
 
 ## Web interfaces
 
-Once running you get three entry points:
+Once running you get two entry points:
 
 | URL | What |
 |---|---|
-| `http://localhost:5173` | **React app** — the primary, full-featured web UI. |
-| `http://localhost:8080/wfaudit.html` | **Standalone HTML console** — one self-contained file with a built-in 13-section help manual, contextual tooltips and a full wordlist generator. Ideal on minimal setups. |
+| `http://localhost:8080/` | **Web UI** — the single self-contained HTML console: all modules, a built-in 13-section help manual, contextual tooltips, universal input persistence and a full wordlist generator. |
 | `http://localhost:8000/docs` | **Swagger API docs** — interactive REST reference; drive WFAudit from any HTTP client or script. |
 
 ## Your first audit
 
-A typical engagement, all doable from either UI (the HTML console's **Help** tab walks through each step in depth):
+A typical engagement, all doable from the UI (the **Help** tab walks through each step in depth):
 
 1. **Dashboard** → confirm the backend is root and all tools are green.
 2. **Sessions** → create a session to track findings for the report.
@@ -327,8 +320,7 @@ WFAudit/
 │   ├── README.md            ← in-depth backend documentation (ES)
 │   └── API_REFERENCE.md     ← full endpoint reference
 └── frontend/
-    ├── wfaudit.html         ← standalone single-file UI (+ built-in help)
-    └── React/               ← React + Vite app (primary UI)
+    └── index.html          ← the entire web UI in one static file (+ built-in help)
 ```
 
 ## Documentation
@@ -336,7 +328,7 @@ WFAudit/
 - **[backend/README.md](backend/README.md)** — exhaustive documentation (Spanish): WiFi security fundamentals, every module explained in depth, workflows and a glossary.
 - **[backend/API_REFERENCE.md](backend/API_REFERENCE.md)** — complete REST endpoint reference.
 - **Swagger UI** — live interactive docs at `http://localhost:8000/docs` while the backend is running.
-- **In-app Help** — the HTML console ships a 13-section manual (overview, workflow, every panel, tips) accessible from its sidebar.
+- **In-app Help** — the web UI ships a 13-section manual (overview, workflow, every panel, tips) accessible from its sidebar.
 
 ## Troubleshooting
 
@@ -345,12 +337,12 @@ WFAudit/
 | *"Backend failed to start"* | Check `logs/backend.log`. Usually a missing Python dep or port `8000` already in use. |
 | *`pydantic-core` fails to build on install* | You're on a very new Python (e.g. 3.14) with an old pin. This repo already ships compatible pins (`pydantic 2.13+`); re-run `sudo ./wfaudit install`. |
 | *`iwconfig` missing (Ubuntu 26.04+)* | `wireless-tools` was dropped upstream; the installer pulls it from the Debian pool automatically. Re-run `install` if you skipped it. |
-| *Frontend not ready* | Vite's first build can take >20 s. Check `logs/frontend.log` and retry the URL. |
+| *Web UI won't load* | Check `logs/frontend.log`. Make sure `frontend/index.html` exists and port `8080` is free. The UI is served at `http://localhost:8080/`. |
 | *"Virtual environment not found"* | Run `sudo ./wfaudit install` first. |
 | *Attack modules don't work* | Run `./wfaudit preflight` (or `curl localhost:8000/system/preflight`) to find missing tools; re-run `install`. |
 | *MITM Full shows cert warnings* | Install the mitmproxy CA on the target device first — download it from the MITM panel (or `~/.mitmproxy/`). |
 | *No internet after stopping* | `stop` flushes `iptables` and the ARP spoof. If a WiFi adapter is stuck: `sudo systemctl restart NetworkManager`. |
-| *Port already in use* | Another WFAudit instance or service holds `8000`/`5173`/`8080`. Change ports via the env vars in §6, or free the port. |
+| *Port already in use* | Another WFAudit instance or service holds `8000`/`8080`. Change ports via the env vars in §6, or free the port. |
 
 ## Contributing
 

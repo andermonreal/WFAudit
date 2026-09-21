@@ -3,14 +3,14 @@
 # WFAudit — WiFi Security Auditing Platform · Management Script
 # ═══════════════════════════════════════════════════════════════
 #
-#   ./wfaudit install    Instala TODO (sistema + Python + Node)
-#   ./wfaudit start      Arranca backend + doble interfaz web
+#   ./wfaudit install    Instala TODO (paquetes del sistema + Python)
+#   ./wfaudit start      Arranca backend + interfaz web
 #   ./wfaudit stop       Para todo y restaura la red
 #   ./wfaudit restart    stop + start
 #   ./wfaudit status     Estado de los servicios
 #   ./wfaudit logs       Tail de los logs en tiempo real
 #   ./wfaudit preflight  Verifica las herramientas del sistema
-#   ./wfaudit clean      Borra .venv, node_modules, logs, .pids
+#   ./wfaudit clean      Borra .venv, logs, .pids
 #   ./wfaudit help       Esta ayuda
 #
 # Estructura esperada (ejecutar desde la raíz del repo):
@@ -19,9 +19,7 @@
 #     ├── backend/                (FastAPI)
 #     │   └── requirements.txt
 #     └── frontend/
-#         ├── wfaudit.html        (interfaz standalone — un solo fichero)
-#         └── React/              (interfaz React + Vite)
-#             └── package.json
+#         └── index.html          (interfaz web — un solo fichero, sin build)
 #
 # El backend necesita root para operaciones WiFi (monitor mode,
 # inyección, iptables, raw sockets). install/start/stop piden sudo.
@@ -35,25 +33,19 @@ set -uo pipefail
 # ══════════ CONFIG ══════════
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="${SCRIPT_DIR}/backend"
-FRONTEND_ROOT="${SCRIPT_DIR}/frontend"       # contiene wfaudit.html
-REACT_DIR="${FRONTEND_ROOT}/React"           # app React + Vite
+FRONTEND_DIR="${SCRIPT_DIR}/frontend"        # contiene index.html (interfaz web)
 VENV_DIR="${SCRIPT_DIR}/.venv"
 LOG_DIR="${SCRIPT_DIR}/logs"
 PID_DIR="${SCRIPT_DIR}/.pids"
 
 BACKEND_HOST="${WFAUDIT_HOST:-0.0.0.0}"
 BACKEND_PORT="${WFAUDIT_PORT:-8000}"
-FRONTEND_PORT="${WFAUDIT_FRONTEND_PORT:-5173}"
-STATIC_PORT="${WFAUDIT_STATIC_PORT:-8080}"
-# WFAUDIT_STATIC=0 desactiva la interfaz HTML standalone
-SERVE_STATIC="${WFAUDIT_STATIC:-1}"
+FRONTEND_PORT="${WFAUDIT_FRONTEND_PORT:-8080}"
 
 BACKEND_LOG="${LOG_DIR}/backend.log"
 FRONTEND_LOG="${LOG_DIR}/frontend.log"
-STATIC_LOG="${LOG_DIR}/static.log"
 BACKEND_PID="${PID_DIR}/backend.pid"
 FRONTEND_PID="${PID_DIR}/frontend.pid"
-STATIC_PID="${PID_DIR}/static.pid"
 
 # Usuario que invocó sudo (para no dejar ficheros root-owned)
 INVOKER="${SUDO_USER:-}"
@@ -87,7 +79,7 @@ require_root() {
 ensure_dirs() { mkdir -p "$LOG_DIR" "$PID_DIR"; }
 
 # Ejecuta un comando como el usuario que invocó sudo (si aplica).
-# Así el node_modules / caché de Vite no quedan como root.
+# Así los ficheros generados no quedan como root.
 as_invoker() {
     if [ -n "$INVOKER" ]; then
         sudo -u "$INVOKER" -H "$@"
@@ -302,26 +294,12 @@ cmd_install() {
     fi
     ok "Entorno del backend listo"
 
-    # ─── Frontend — Node + npm ───
-    step "Entorno Node del frontend (React)"
-    if [ ! -f "$REACT_DIR/package.json" ]; then
-        warn "No se encontró $REACT_DIR/package.json — se omite el frontend React"
+    # ─── Frontend — interfaz web (index.html, sin build) ───
+    step "Interfaz web"
+    if [ -f "$FRONTEND_DIR/index.html" ]; then
+        ok "Interfaz web lista (frontend/index.html — un solo fichero, sin dependencias)"
     else
-        if ! command -v node >/dev/null 2>&1; then
-            info "Node.js no encontrado — instalando vía NodeSource (20.x)..."
-            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || warn "Setup de NodeSource falló"
-            apt-get install -y nodejs 2>/dev/null || warn "No se pudo instalar nodejs automáticamente"
-        else
-            info "Node.js encontrado: $(node --version)"
-        fi
-
-        if command -v npm >/dev/null 2>&1; then
-            info "Instalando paquetes npm (esto puede tardar)..."
-            ( cd "$REACT_DIR" && as_invoker npm install ) || warn "npm install devolvió errores — revisa $REACT_DIR"
-            ok "Entorno del frontend React listo"
-        else
-            warn "npm no disponible — instala Node.js manualmente y ejecuta 'npm install' en $REACT_DIR"
-        fi
+        warn "No se encontró $FRONTEND_DIR/index.html"
     fi
 
     # ─── Certificado CA de mitmproxy ───
@@ -386,35 +364,16 @@ cmd_start() {
         exit 1
     fi
 
-    # ─── Frontend React (Vite) ───
-    step "Arrancando Frontend React (Vite)"
-    if [ -f "$REACT_DIR/package.json" ] && command -v npm >/dev/null 2>&1; then
-        launch "$FRONTEND_PID" "$FRONTEND_LOG" "$REACT_DIR" "$INVOKER" \
-            npm run dev -- --host --port "$FRONTEND_PORT"
-        info "Esperando a Vite (la primera compilación puede tardar)..."
-        for _ in $(seq 1 20); do
-            sleep 1
-            curl -sf "http://localhost:${FRONTEND_PORT}" >/dev/null 2>&1 && break
-            printf "."
-        done
-        echo
-        if curl -sf "http://localhost:${FRONTEND_PORT}" >/dev/null 2>&1; then
-            ok "Frontend React arriba (PID $(cat "$FRONTEND_PID"))"
-        else
-            warn "Vite todavía compilando — revisa $FRONTEND_LOG en unos segundos"
-        fi
-    else
-        warn "Frontend React no disponible (falta package.json o npm) — se omite"
-    fi
-
-    # ─── Interfaz HTML standalone ───
-    if [ "$SERVE_STATIC" = "1" ] && [ -f "$FRONTEND_ROOT/wfaudit.html" ]; then
-        step "Sirviendo interfaz HTML standalone"
-        launch "$STATIC_PID" "$STATIC_LOG" "$FRONTEND_ROOT" "$INVOKER" \
-            python3 -m http.server "$STATIC_PORT" --bind 0.0.0.0
+    # ─── Interfaz web (index.html, servida con python http.server) ───
+    if [ -f "$FRONTEND_DIR/index.html" ]; then
+        step "Arrancando interfaz web"
+        launch "$FRONTEND_PID" "$FRONTEND_LOG" "$FRONTEND_DIR" "$INVOKER" \
+            python3 -m http.server "$FRONTEND_PORT" --bind 0.0.0.0
         sleep 1
-        is_running "$STATIC_PID" && ok "Interfaz standalone arriba (PID $(cat "$STATIC_PID"))" \
-                                 || warn "No se pudo servir la interfaz standalone (revisa $STATIC_LOG)"
+        is_running "$FRONTEND_PID" && ok "Interfaz web arriba (PID $(cat "$FRONTEND_PID"))" \
+                                   || warn "No se pudo servir la interfaz web (revisa $FRONTEND_LOG)"
+    else
+        warn "No se encontró $FRONTEND_DIR/index.html — se omite la interfaz web"
     fi
 
     hr
@@ -422,9 +381,7 @@ cmd_start() {
     echo
     echo "  Backend / API .... http://localhost:${BACKEND_PORT}        (docs Swagger en /docs)"
     is_running "$FRONTEND_PID" && \
-    echo "  Interfaz React ... http://localhost:${FRONTEND_PORT}"
-    is_running "$STATIC_PID" && \
-    echo "  Interfaz HTML .... http://localhost:${STATIC_PORT}/wfaudit.html"
+    echo "  Interfaz web ..... http://localhost:${FRONTEND_PORT}/"
     echo
     echo "  Logs:  ./wfaudit logs        Estado: ./wfaudit status"
     echo "  Parar: sudo ./wfaudit stop"
@@ -438,8 +395,7 @@ cmd_stop() {
     step "Deteniendo WFAudit"
 
     local stopped=false
-    stop_service "$STATIC_PID"   "interfaz HTML" false && stopped=true
-    stop_service "$FRONTEND_PID" "frontend React" false && stopped=true
+    stop_service "$FRONTEND_PID" "interfaz web" false && stopped=true
     # Backend con parada grácil: uvicorn ejecuta su cleanup (process_manager)
     stop_service "$BACKEND_PID"  "backend" true && stopped=true
 
@@ -449,8 +405,8 @@ cmd_stop() {
              airodump-ng aireplay-ng hcxdumptool; do
         pkill -f "$p" 2>/dev/null || true
     done
-    # Restos de Vite/uvicorn en los puertos configurados
-    pkill -f "vite.*${FRONTEND_PORT}" 2>/dev/null || true
+    # Restos de uvicorn / servidor web en los puertos configurados
+    pkill -f "http.server ${FRONTEND_PORT}" 2>/dev/null || true
     pkill -f "uvicorn.*app.main" 2>/dev/null || true
 
     # Restaurar el estado de la red (crítico tras MITM / Evil Twin)
@@ -480,14 +436,9 @@ cmd_status() {
         echo "  Backend ....... ○ STOPPED"
     fi
     if is_running "$FRONTEND_PID"; then
-        echo "  React (Vite) .. ● RUNNING   PID $(cat "$FRONTEND_PID")   http://localhost:${FRONTEND_PORT}"
+        echo "  Interfaz web .. ● RUNNING   PID $(cat "$FRONTEND_PID")   http://localhost:${FRONTEND_PORT}/"
     else
-        echo "  React (Vite) .. ○ STOPPED"
-    fi
-    if is_running "$STATIC_PID"; then
-        echo "  HTML standalone ● RUNNING   PID $(cat "$STATIC_PID")   http://localhost:${STATIC_PORT}/wfaudit.html"
-    else
-        echo "  HTML standalone ○ STOPPED"
+        echo "  Interfaz web .. ○ STOPPED"
     fi
 
     if is_running "$BACKEND_PID"; then
@@ -512,7 +463,6 @@ cmd_logs() {
     local files=()
     [ -f "$BACKEND_LOG" ]  && files+=("$BACKEND_LOG")
     [ -f "$FRONTEND_LOG" ] && files+=("$FRONTEND_LOG")
-    [ -f "$STATIC_LOG" ]   && files+=("$STATIC_LOG")
     [ ${#files[@]} -eq 0 ] && die "No hay logs. ¿Está WFAudit arrancado?"
 
     if command -v multitail >/dev/null 2>&1; then
@@ -553,24 +503,23 @@ cmd_preflight() {
 
 # ══════════ CLEAN ══════════
 cmd_clean() {
-    warn "Esto eliminará: .venv, frontend/React/node_modules, logs/ y .pids/"
+    warn "Esto eliminará: .venv, logs/ y .pids/"
     read -r -p "¿Continuar? [y/N] " reply
     case "$reply" in
         [yY]|[yY][eE][sS]) ;;
         *) info "Cancelado"; exit 0 ;;
     esac
 
-    if is_running "$BACKEND_PID" || is_running "$FRONTEND_PID" || is_running "$STATIC_PID"; then
+    if is_running "$BACKEND_PID" || is_running "$FRONTEND_PID"; then
         info "Parando servicios primero..."
         require_root clean
         cmd_stop
     fi
 
     step "Limpiando"
-    [ -d "$VENV_DIR" ]               && rm -rf "$VENV_DIR"               && ok "Eliminado .venv"
-    [ -d "$REACT_DIR/node_modules" ] && rm -rf "$REACT_DIR/node_modules" && ok "Eliminado node_modules"
-    [ -d "$LOG_DIR" ]                && rm -rf "$LOG_DIR"                && ok "Eliminado logs/"
-    [ -d "$PID_DIR" ]                && rm -rf "$PID_DIR"                && ok "Eliminado .pids/"
+    [ -d "$VENV_DIR" ] && rm -rf "$VENV_DIR" && ok "Eliminado .venv"
+    [ -d "$LOG_DIR" ]  && rm -rf "$LOG_DIR"  && ok "Eliminado logs/"
+    [ -d "$PID_DIR" ]  && rm -rf "$PID_DIR"  && ok "Eliminado .pids/"
     ok "Limpieza completa"
 }
 
@@ -582,30 +531,28 @@ USO
     ./wfaudit <comando>
 
 COMANDOS
-    install    Instala paquetes del sistema, venv Python y módulos Node
+    install    Instala paquetes del sistema y el venv de Python
                Requiere root:  sudo ./wfaudit install
-    start      Arranca backend (FastAPI) + interfaz React + interfaz HTML
+    start      Arranca backend (FastAPI) + interfaz web
                Requiere root:  sudo ./wfaudit start
     stop       Para todo, mata ataques residuales y restaura la red (root)
     restart    stop + start
     status     Estado de los servicios y ataques activos
     logs       Tail de los logs en tiempo real
     preflight  Comprueba que las herramientas del sistema estén instaladas
-    clean      Borra .venv, node_modules, logs y .pids (reset completo)
+    clean      Borra .venv, logs y .pids (reset completo)
     help       Esta ayuda
 
 VARIABLES DE ENTORNO
     WFAUDIT_HOST           Host del backend        (default: 0.0.0.0)
     WFAUDIT_PORT           Puerto del backend      (default: 8000)
-    WFAUDIT_FRONTEND_PORT  Puerto de React/Vite    (default: 5173)
-    WFAUDIT_STATIC_PORT    Puerto interfaz HTML    (default: 8080)
-    WFAUDIT_STATIC=0       No servir la interfaz HTML standalone
+    WFAUDIT_FRONTEND_PORT  Puerto de la interfaz web (default: 8080)
 
 PRIMER USO
     sudo ./wfaudit install        # Setup único
     sudo ./wfaudit start          # Arrancar
-    #  → http://localhost:5173            (interfaz React)
-    #  → http://localhost:8080/wfaudit.html  (interfaz standalone)
+    #  → http://localhost:8080/            (interfaz web)
+    #  → http://localhost:8000/docs        (API / Swagger)
     sudo ./wfaudit stop           # Al terminar
 
 AVISO LEGAL
