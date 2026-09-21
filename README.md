@@ -37,6 +37,7 @@ Instead of juggling a dozen terminals and hand-parsing incompatible outputs, you
   - [10. Remote / LAN access & hardening](#10-remote--lan-access--hardening)
 - [Web interfaces](#web-interfaces)
 - [Your first audit](#your-first-audit)
+- [Sessions & reporting](#sessions--reporting)
 - [Project structure](#project-structure)
 - [Documentation](#documentation)
 - [Troubleshooting](#troubleshooting)
@@ -53,7 +54,7 @@ Instead of juggling a dozen terminals and hand-parsing incompatible outputs, you
 - 🚀 **One-command deploy** — `sudo ./wfaudit install` sets up everything; `sudo ./wfaudit start` / `stop` runs and tears it down cleanly.
 - 🧱 **Clean architecture** — three layers (HTTP routers → business services → tool utilities), fully async, easy to extend.
 - 🔒 **Safe teardown** — `stop` kills residual attack processes and restores `iptables` / IP-forwarding so your machine goes back to normal.
-- 📋 **Engagement tracking** — sessions, severity-rated findings and structured JSON report export baked in.
+- 📋 **Engagement tracking** — sessions with severity-rated findings, CVSS, photo evidence, an activity timeline and one-click **PDF / JSON** report export. See [Sessions & reporting](#sessions--reporting).
 
 ## What it can do
 
@@ -74,7 +75,7 @@ WFAudit is organized into modules. Each is exposed both in the web UIs and as RE
 | **MITM** | Bidirectional ARP spoofing + `mitmproxy`. **Stealth mode** (DNS + TLS SNI + HTTP, no device warnings) or **Full mode** (HTTPS interception with a downloadable CA). Real-time flow viewer. |
 | **Wordlists** | Build custom dictionaries from seed words: leetspeak, case mutations, number/symbol appendages, year/date formats, word combination and language-targeted presets — with live preview & size estimation. |
 | **Captures** | Central management of capture files (`.cap`, `.pcap`, `.pcapng`, `.22000`, `.csv`, `.jsonl`) with handshake/PMKID verification. |
-| **Sessions** | Document engagements: findings categorized by severity, edited/tracked live and exported as structured JSON reports. |
+| **Sessions** | Document engagements: severity-rated findings with CVSS, photo evidence and a full activity timeline; active/closed lifecycle (reopen requires a logged reason); exported as a professional **PDF** or structured **JSON** report. See [Sessions & reporting](#sessions--reporting). |
 
 ## Architecture
 
@@ -300,8 +301,68 @@ A typical engagement, all doable from the UI (the **Help** tab walks through eac
 5. **PMKID** (fast, clientless) or **Handshake** capture → then crack under **Handshake & Crack** with a wordlist (build one under **Wordlists**).
 6. **Attacks / Advanced** → Evil Twin, MITM, Enterprise or WPA3 as scoped.
 7. **Recon** → map the internal network once you have access (host discovery, service/vuln scans, router probe).
-8. **Sessions** → log findings as you go, then export the JSON report.
+8. **Sessions** → log findings (with photo evidence) as you go, then export the PDF or JSON report — see [Sessions & reporting](#sessions--reporting).
 9. `sudo ./wfaudit stop` → restore the network.
+
+## Sessions & reporting
+
+**Sessions** are WFAudit's engagement layer — where everything you find during an audit is documented, tracked and turned into the client deliverable. Open it from the sidebar (`Principal → Sesiones`). The sidebar always shows which session is **active**, so new findings have somewhere to land.
+
+### Session lifecycle
+
+| Status | Meaning |
+|---|---|
+| **Active** (`active`) | Open engagement. Accepts new findings, edits and evidence. |
+| **Closed** (`closed`) | Finalized and **read-only for findings** — reopen it to change anything. |
+
+- **One active session at a time.** *Activar* makes a session the current target; *Desactivar* leaves none active. Any button that navigates to Sessions jumps straight to the active session when there is one.
+- **Closing** a session asks for confirmation first.
+- **Reopening** a closed session **requires a reason**, recorded in the timeline — you always know why and when an engagement was reopened.
+- **Deleting** a session (findings + photo evidence + PDF) is guarded by a **double confirmation**.
+
+### Findings
+
+Each finding is a structured, report-ready entry:
+
+| Field | Notes |
+|---|---|
+| **Severity** | `critical` · `high` · `medium` · `low` · `info` — colour-coded throughout the UI and the PDF. |
+| **Category** | WiFi, network, MITM, credentials… |
+| **CVSS** | Optional CVSS v3.1 score (0.0–10.0). |
+| **Title / Description / Evidence / Recommendation** | Free text; *Evidence* is monospaced for command output. |
+| **Photo evidence** | Several images per finding, attached from the add/edit modal (even before the finding is saved) and embedded into the PDF. |
+
+- **Click a finding** to open a large read-only view (title, badges, description, evidence, photo gallery, recommendation) — nothing cramped into a tiny box.
+- **Add / edit** run in a dedicated modal with the photo manager built in.
+- **Sort** by severity, newest or oldest report date; **filter** by severity and category.
+- Each card shows its **report date**, plus the **last-edited date** when it has been modified.
+
+### Timeline (activity log)
+
+Every session keeps a full chronological log for traceability. Events are recorded automatically — creation, findings added / edited / deleted, evidence uploaded, close and reopen (with its reason) — and you can add your own **comments, notes and corrections** as the engagement evolves.
+
+### The three sub-tabs
+
+| Sub-tab | What it shows |
+|---|---|
+| **Resumen** | Visual overview: severity breakdown, computed risk level and priority findings. |
+| **Hallazgos** | The full findings list — sortable and filterable. |
+| **Timeline** | The complete activity log. |
+
+### Exporting the report
+
+- **PDF** — a professional report (cover, executive summary with a severity table and overall risk level, then every finding by severity with its embedded photos), downloaded with one click.
+- **JSON** — the same data structured for tooling or archival (`GET /sessions/{id}/report`).
+
+### Where it's stored
+
+Sessions persist to disk on every change, so nothing is lost on restart:
+
+```
+<DATA_DIR>/reports/session_<id>.json    ← the session (findings, events, metadata)
+<DATA_DIR>/reports/informe_<id>.pdf     ← generated PDF report
+<DATA_DIR>/evidence/<id>/<finding>/     ← uploaded photo evidence
+```
 
 ## Project structure
 

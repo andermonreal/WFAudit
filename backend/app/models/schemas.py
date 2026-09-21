@@ -338,16 +338,21 @@ class AuditSession(BaseModel):
     company: str
     auditor: str
     created_at: datetime
-    status: str = "active"
+    status: str = "active"          # active (abierta) | closed (cerrada)
     notes: Optional[str] = None
     interface_used: Optional[str] = None
     findings: list[dict] = []
+    events: list[dict] = []         # timeline: creación, hallazgos, cierre/reapertura, comentarios
+    updated_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    scope: Optional[str] = None     # alcance de la auditoría
 
 class CreateSessionRequest(BaseModel):
     name: str
     company: str
     auditor: str
     notes: Optional[str] = None
+    scope: Optional[str] = None
 
 class Finding(BaseModel):
     session_id: str
@@ -357,6 +362,14 @@ class Finding(BaseModel):
     description: str
     evidence: Optional[str] = None
     recommendation: Optional[str] = None
+    cvss: Optional[str] = None
+
+class ReasonRequest(BaseModel):
+    reason: Optional[str] = None
+
+class EventRequest(BaseModel):
+    type: str = "comment"           # comment | note | correction
+    message: str
 
 
 # ── Wordlist Generator ──

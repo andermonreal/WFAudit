@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     LOGS_DIR: Path = DATA_DIR / "logs"
     HOSTAPD_DIR: Path = DATA_DIR / "hostapd"
     ENTERPRISE_DIR: Path = DATA_DIR / "enterprise"
+    EVIDENCE_DIR: Path = DATA_DIR / "evidence"
     OUI_DB_PATH: Path = DATA_DIR / "oui.txt"
 
     # Tool paths
@@ -58,5 +59,6 @@ for d in [
     settings.DATA_DIR, settings.CAPTURES_DIR, settings.REPORTS_DIR,
     settings.HANDSHAKES_DIR, settings.PMKID_DIR, settings.WORDLISTS_DIR,
     settings.LOGS_DIR, settings.HOSTAPD_DIR, settings.ENTERPRISE_DIR,
+    settings.EVIDENCE_DIR,
 ]:
     d.mkdir(parents=True, exist_ok=True)
