@@ -106,6 +106,59 @@ check_distro() {
     fi
 }
 
+# iwconfig (wireless-tools) es crítico para WFAudit, pero fue eliminado de los
+# repos de Ubuntu 26.04+. Si apt no lo tiene, lo traemos del pool de Debian.
+ensure_iwconfig() {
+    if command -v iwconfig >/dev/null 2>&1; then
+        ok "iwconfig disponible"
+        return 0
+    fi
+
+    info "iwconfig no encontrado — intentando instalar wireless-tools"
+
+    # Solo aplica a familias Debian/Ubuntu (dpkg). Otras distros: aviso.
+    if ! command -v dpkg >/dev/null 2>&1; then
+        warn "iwconfig ausente y no es un sistema dpkg — instálalo manualmente (wireless-tools)"
+        return 1
+    fi
+
+    # 1) Intento normal por si el paquete sigue en los repos de esta distro.
+    if apt-get install -y -qq wireless-tools 2>/dev/null && command -v iwconfig >/dev/null 2>&1; then
+        ok "wireless-tools instalado desde repositorios"
+        return 0
+    fi
+
+    # 2) Fallback: descargar los .deb del pool de Debian (paquete congelado
+    #    hace años; libiw30t64 = variante con time_t de 64 bits, la de Ubuntu 24.04+).
+    warn "wireless-tools no está en los repos — descargando del pool de Debian"
+    local arch base tmp libiw wt
+    arch="$(dpkg --print-architecture)"
+    base="http://ftp.debian.org/debian/pool/main/w/wireless-tools"
+    tmp="$(mktemp -d)"
+    libiw="libiw30t64_30~pre9-23_${arch}.deb"
+    wt="wireless-tools_30~pre9-23_${arch}.deb"
+
+    if curl -fsSL -o "$tmp/$libiw" "$base/$libiw" \
+        && curl -fsSL -o "$tmp/$wt" "$base/$wt"; then
+        # apt resuelve deps (libc6) e instala ambos .deb locales.
+        if apt-get install -y -qq "$tmp/$libiw" "$tmp/$wt" 2>/dev/null \
+            || dpkg -i "$tmp/$libiw" "$tmp/$wt" >/dev/null 2>&1; then
+            apt-get install -y -qq -f >/dev/null 2>&1 || true
+        fi
+    else
+        warn "No se pudieron descargar los .deb de wireless-tools (¿sin red?)"
+    fi
+    rm -rf "$tmp"
+
+    if command -v iwconfig >/dev/null 2>&1; then
+        ok "iwconfig instalado (wireless-tools desde pool de Debian)"
+        return 0
+    fi
+
+    warn "No se pudo instalar iwconfig automáticamente — instálalo a mano (wireless-tools)"
+    return 1
+}
+
 is_running() {
     local pidfile="$1"
     [ -f "$pidfile" ] || return 1
@@ -213,6 +266,8 @@ cmd_install() {
             ;;
     esac
     ok "Dependencias del sistema procesadas"
+
+    ensure_iwconfig || true
 
     # ─── Backend — venv Python ───
     step "Entorno Python del backend"

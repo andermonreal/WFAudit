@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from app.models.schemas import CreateSessionRequest, Finding
 from app.services.session_service import session_service
 
@@ -25,9 +25,27 @@ async def add_finding(session_id: str, finding: Finding):
     if "error" in r: raise HTTPException(404, r["error"])
     return r
 
+@router.patch("/{session_id}/findings/{finding_id}")
+async def update_finding(session_id: str, finding_id: str, updates: dict = Body(...)):
+    r = session_service.update_finding(session_id, finding_id, updates)
+    if "error" in r: raise HTTPException(404, r["error"])
+    return r
+
+@router.delete("/{session_id}/findings/{finding_id}")
+async def delete_finding(session_id: str, finding_id: str):
+    r = session_service.delete_finding(session_id, finding_id)
+    if "error" in r: raise HTTPException(404, r["error"])
+    return r
+
 @router.post("/{session_id}/close")
 async def close_session(session_id: str):
     s = session_service.close(session_id)
+    if not s: raise HTTPException(404, "Session not found")
+    return s
+
+@router.post("/{session_id}/reopen")
+async def reopen_session(session_id: str):
+    s = session_service.reopen(session_id)
     if not s: raise HTTPException(404, "Session not found")
     return s
 
