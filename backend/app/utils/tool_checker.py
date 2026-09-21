@@ -3,6 +3,14 @@
 import shutil
 import platform
 import os
+import socket
+import getpass
+import time
+
+try:
+    import psutil
+except ImportError:  # pragma: no cover
+    psutil = None
 
 REQUIRED_TOOLS = {
     "airmon-ng": {"package": "aircrack-ng", "critical": True, "category": "wifi"},
@@ -67,15 +75,55 @@ async def check_root() -> bool:
     return os.geteuid() == 0
 
 
+def _cpu_model() -> str:
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.lower().startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+    return platform.processor() or "—"
+
+
 async def get_system_info() -> dict:
-    return {
+    info = {
         "os": platform.system(),
+        "distro": _get_distro(),
+        "hostname": socket.gethostname(),
+        "kernel": platform.release(),
         "release": platform.release(),
         "arch": platform.machine(),
         "python": platform.python_version(),
+        "python_version": platform.python_version(),
+        "user": getpass.getuser(),
         "is_root": await check_root(),
-        "distro": _get_distro(),
+        "cpu_model": _cpu_model(),
     }
+    if psutil is not None:
+        try:
+            vm = psutil.virtual_memory()
+            du = psutil.disk_usage("/")
+            info.update({
+                "cpu_count": psutil.cpu_count(logical=True),
+                "cpu_count_physical": psutil.cpu_count(logical=False),
+                "cpu_percent": psutil.cpu_percent(interval=0.15),
+                "memory_total_gb": round(vm.total / 1e9, 2),
+                "memory_used_gb": round(vm.used / 1e9, 2),
+                "memory_available_gb": round(vm.available / 1e9, 2),
+                "memory_percent": vm.percent,
+                "disk_total_gb": round(du.total / 1e9, 2),
+                "disk_used_gb": round(du.used / 1e9, 2),
+                "disk_percent": du.percent,
+                "uptime_seconds": int(time.time() - psutil.boot_time()),
+            })
+        except Exception:
+            pass
+    try:
+        info["load_avg"] = [round(x, 2) for x in os.getloadavg()]
+    except Exception:
+        info["load_avg"] = None
+    return info
 
 
 def _get_distro() -> str:
