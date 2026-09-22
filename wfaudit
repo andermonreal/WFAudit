@@ -18,8 +18,10 @@
 #     ├── wfaudit                 (este script)
 #     ├── backend/                (FastAPI)
 #     │   └── requirements.txt
-#     └── frontend/
-#         └── index.html          (interfaz web — un solo fichero, sin build)
+#     └── web/                    (interfaz web estática, sin build)
+#         ├── index.html
+#         ├── css/styles.css
+#         └── js/*.js
 #
 # El backend necesita root para operaciones WiFi (monitor mode,
 # inyección, iptables, raw sockets). install/start/stop piden sudo.
@@ -33,7 +35,7 @@ set -uo pipefail
 # ══════════ CONFIG ══════════
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="${SCRIPT_DIR}/backend"
-FRONTEND_DIR="${SCRIPT_DIR}/frontend"        # contiene index.html (interfaz web)
+FRONTEND_DIR="${SCRIPT_DIR}/web"             # interfaz web estática (index.html + css/ + js/)
 VENV_DIR="${SCRIPT_DIR}/.venv"
 LOG_DIR="${SCRIPT_DIR}/logs"
 PID_DIR="${SCRIPT_DIR}/.pids"
@@ -297,7 +299,7 @@ cmd_install() {
     # ─── Frontend — interfaz web (index.html, sin build) ───
     step "Interfaz web"
     if [ -f "$FRONTEND_DIR/index.html" ]; then
-        ok "Interfaz web lista (frontend/index.html — un solo fichero, sin dependencias)"
+        ok "Interfaz web lista (web/ — estática, sin build ni dependencias)"
     else
         warn "No se encontró $FRONTEND_DIR/index.html"
     fi

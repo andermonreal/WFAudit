@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT">
   <img src="https://img.shields.io/badge/python-3.11%E2%80%933.14-blue.svg" alt="Python 3.11–3.14">
   <img src="https://img.shields.io/badge/backend-FastAPI-009688.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/frontend-single--file%20HTML-61dafb.svg" alt="Single-file HTML UI">
+  <img src="https://img.shields.io/badge/web%20UI-static%20%C2%B7%20no%20build-61dafb.svg" alt="Static web UI, no build">
   <img src="https://img.shields.io/badge/platform-Linux-000000.svg" alt="Platform: Linux">
   <img src="https://img.shields.io/badge/deploy-one%20command-ff8c42.svg" alt="One-command deploy">
 </p>
@@ -50,7 +50,7 @@ Instead of juggling a dozen terminals and hand-parsing incompatible outputs, you
 ## Highlights
 
 - 🧭 **One API, many tools** — 75+ REST endpoints across 9 modules wrapping the industry-standard wireless toolkit, with auto-generated Swagger docs at `/docs`.
-- 🖥️ **Zero-dependency web UI** — a single self-contained **HTML** file (no build, no `node_modules`) with a built-in 13-section help manual, contextual tooltips and universal input persistence across tabs.
+- 🖥️ **Zero-dependency web UI** — static **HTML/CSS/JS** split into small modules (no build, no `node_modules`) with a built-in 13-section help manual, contextual tooltips and universal input persistence across tabs.
 - 🚀 **One-command deploy** — `sudo ./wfaudit install` sets up everything; `sudo ./wfaudit start` / `stop` runs and tears it down cleanly.
 - 🧱 **Clean architecture** — three layers (HTTP routers → business services → tool utilities), fully async, easy to extend.
 - 🔒 **Safe teardown** — `stop` kills residual attack processes and restores `iptables` / IP-forwarding so your machine goes back to normal.
@@ -104,7 +104,7 @@ Everything below is what you need to install, run, configure and tear down WFAud
 | **OS** | **Linux only** (needs monitor mode, `iptables`, raw sockets). **Kali** or **Parrot OS** recommended — the tooling ships preinstalled. Debian/Ubuntu/Arch/Fedora work too. |
 | **Privileges** | The backend **must run as root**. `install`, `start`, `stop`, `restart` require `sudo`. `status`, `logs`, `preflight`, `help` do **not**. |
 | **Python** | 3.11+ (tested up to **3.14**). Created as a project-local `.venv` by the installer. |
-| **Node.js** | Not required. The web UI is a single static HTML file served by Python's built-in HTTP server — no build step, no `node_modules`. |
+| **Node.js** | Not required. The web UI is static HTML/CSS/JS served by Python's built-in HTTP server — no build step, no `node_modules`. |
 | **WiFi adapter** | At least **one** adapter with **monitor mode + packet injection**; **two** for Evil Twin / Enterprise / AP-Less (one AP, one monitor). |
 | **GPU** *(optional)* | Any CUDA/OpenCL GPU accelerates `hashcat` cracking by 100–1000×. |
 | **Disk** | ~1–2 GB for system packages + the Python venv. Captures/wordlists grow with use. |
@@ -175,7 +175,7 @@ The installer is **idempotent** (safe to re-run) and **distro-aware**. In order,
 3. **Creates the Python venv** at `./.venv`, upgrades `pip`/`wheel`/`setuptools`, and installs `backend/requirements.txt`:
    `fastapi` · `uvicorn` · `pydantic` · `pydantic-settings` · `python-multipart` · `websockets` · `aiofiles` · `psutil` · `python-nmap` · `scapy` · `netifaces2` · `mitmproxy`.
    The venv is then `chown`ed back to the invoking user so it stays readable without `sudo`.
-4. **Checks the web UI** — `frontend/index.html` is a single static file with no build step or dependencies, so there's nothing to install.
+4. **Checks the web UI** — `web/` is static HTML/CSS/JS with no build step or dependencies, so there's nothing to install.
 5. **Generates the mitmproxy CA** used by MITM *Full* mode, at `~/.mitmproxy/` (the invoking user's home).
 
 When it finishes you'll see `✓ Instalación completa`. If anything is missing later, run [`./wfaudit preflight`](#9-verifying-the-deployment).
@@ -191,11 +191,11 @@ sudo ./wfaudit start
 | Service | Command | Runs as | Port | Working dir | Log | PID file |
 |---|---|:---:|:---:|---|---|---|
 | **Backend** (FastAPI) | `.venv/bin/uvicorn app.main:app --host $WFAUDIT_HOST --port $WFAUDIT_PORT` | **root** | `8000` | `backend/` | `logs/backend.log` | `.pids/backend.pid` |
-| **Web UI** (static) | `python3 -m http.server $WFAUDIT_FRONTEND_PORT --bind 0.0.0.0` | `$SUDO_USER` | `8080` | `frontend/` | `logs/frontend.log` | `.pids/frontend.pid` |
+| **Web UI** (static) | `python3 -m http.server $WFAUDIT_FRONTEND_PORT --bind 0.0.0.0` | `$SUDO_USER` | `8080` | `web/` | `logs/frontend.log` | `.pids/frontend.pid` |
 
 - The backend is the only service that needs root; the web UI is dropped to your normal user.
 - `start` refuses to run if a backend PID is already active — use `stop` (or `restart`) first.
-- The web UI serves `frontend/index.html` at the root path, so `http://localhost:8080/` loads it directly.
+- The web UI serves `web/index.html` at the root path, so `http://localhost:8080/` loads it directly.
 
 ### 5. The `wfaudit` control script
 
@@ -287,7 +287,7 @@ Once running you get two entry points:
 
 | URL | What |
 |---|---|
-| `http://localhost:8080/` | **Web UI** — the single self-contained HTML console: all modules, a built-in 13-section help manual, contextual tooltips, universal input persistence and a full wordlist generator. |
+| `http://localhost:8080/` | **Web UI** — the static web console: all modules, a built-in 13-section help manual, contextual tooltips, universal input persistence and a full wordlist generator. |
 | `http://localhost:8000/docs` | **Swagger API docs** — interactive REST reference; drive WFAudit from any HTTP client or script. |
 
 ## Your first audit
@@ -380,8 +380,10 @@ WFAudit/
 │   ├── requirements.txt
 │   ├── README.md            ← in-depth backend documentation (ES)
 │   └── API_REFERENCE.md     ← full endpoint reference
-└── frontend/
-    └── index.html          ← the entire web UI in one static file (+ built-in help)
+└── web/                     ← static web UI (no build, no node_modules)
+    ├── index.html          ← markup + <link>/<script src> only
+    ├── css/styles.css      ← all styles
+    └── js/                 ← core · recon · sessions · capture · attacks · app
 ```
 
 ## Documentation
@@ -398,7 +400,7 @@ WFAudit/
 | *"Backend failed to start"* | Check `logs/backend.log`. Usually a missing Python dep or port `8000` already in use. |
 | *`pydantic-core` fails to build on install* | You're on a very new Python (e.g. 3.14) with an old pin. This repo already ships compatible pins (`pydantic 2.13+`); re-run `sudo ./wfaudit install`. |
 | *`iwconfig` missing (Ubuntu 26.04+)* | `wireless-tools` was dropped upstream; the installer pulls it from the Debian pool automatically. Re-run `install` if you skipped it. |
-| *Web UI won't load* | Check `logs/frontend.log`. Make sure `frontend/index.html` exists and port `8080` is free. The UI is served at `http://localhost:8080/`. |
+| *Web UI won't load* | Check `logs/frontend.log`. Make sure `web/index.html` exists and port `8080` is free. The UI is served at `http://localhost:8080/`. |
 | *"Virtual environment not found"* | Run `sudo ./wfaudit install` first. |
 | *Attack modules don't work* | Run `./wfaudit preflight` (or `curl localhost:8000/system/preflight`) to find missing tools; re-run `install`. |
 | *MITM Full shows cert warnings* | Install the mitmproxy CA on the target device first — download it from the MITM panel (or `~/.mitmproxy/`). |

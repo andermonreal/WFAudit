@@ -1,32 +1,24 @@
-**/__pycache__
-**/.venv
-logs
-.pids
+# ── Python ──
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+**/.venv/
 
-backend/data
+# ── Runtime data & artefactos (capturas, informes, evidencias, wordlists…) ──
+backend/data/
+data/
 
-# Logs
-frontend/logs
-frontend/*.log
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/pnpm-debug.log*
-frontend/lerna-debug.log*
+# ── Logs y PIDs del script de control ──
+logs/
+.pids/
 
-frontend/package-lock.json
-frontend/node_modules
-frontend/dist
-frontend/dist-ssr
-frontend/*.local
+# ── Variables de entorno (se conserva .env.example) ──
+.env
+backend/.env
 
-# Editor directories and files
-frontend/.vscode/*
-frontend/!.vscode/extensions.json
-frontend/.idea
-frontend/.DS_Store
-frontend/*.suo
-frontend/*.ntvs*
-frontend/*.njsproj
-frontend/*.sln
-frontend/*.sw?
+# ── Editor / SO ──
+.vscode/
+.idea/
+.DS_Store
+*.swp
