@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "WiFi Audit Backend"
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = True
-    HOST: str = "0.0.0.0"
+    HOST: str = "127.0.0.1"  # solo localhost por defecto; la exposición en LAN es opt-in (ver wfaudit / WFAUDIT_TOKEN)
     PORT: int = 8000
 
     # Paths

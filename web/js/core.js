@@ -1,5 +1,14 @@
 // WFAudit · core — cliente API, estado, persistencia de inputs, helpers, modales, toasts, navegación, tema y barra lateral responsive
-const API='http://localhost:8000';
+// La API se sirve desde el MISMO host que la interfaz (puerto 8000), para que
+// funcione igual en localhost que accediendo por la IP de la LAN. Si se abre como
+// file:// (hostname vacío) se cae a localhost.
+const API=`${location.protocol==='https:'?'https':'http'}://${location.hostname||'localhost'}:8000`;
+// ─── Token de acceso ─── (solo necesario si el backend se expone en LAN con WFAUDIT_TOKEN)
+let AUTH_TOKEN=localStorage.getItem('wf_token')||'';
+function setToken(t){AUTH_TOKEN=(t||'').trim();try{AUTH_TOKEN?localStorage.setItem('wf_token',AUTH_TOKEN):localStorage.removeItem('wf_token');}catch{}}
+function authHeaders(){return AUTH_TOKEN?{'Authorization':'Bearer '+AUTH_TOKEN}:{};}
+// Para URLs que van directas al DOM (img/PDF/descargas) y no pueden llevar cabecera → token por query.
+function withTok(u){return AUTH_TOKEN?u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(AUTH_TOKEN):u;}
 const ST={section:'dashboard',theme:localStorage.getItem('theme')||'dark',activeSession:JSON.parse(localStorage.getItem('activeSession')||'null'),processes:[],apiOk:false,lastScan:JSON.parse(localStorage.getItem('lastScan')||'null')};
 // ─── Persistencia UNIVERSAL de inputs ───
 // Cualquier <input>/<select>/<textarea> con id dentro de #content se guarda
@@ -12,9 +21,10 @@ function restoreInputs(root){if(!root)return;root.querySelectorAll('input[id],se
 function setIP(obj){Object.assign(IP,obj);try{localStorage.setItem('IP',JSON.stringify(IP));}catch{}}
 // Compat: shims no-op (el sistema universal ya cubre estos casos)
 function saveFP(){}function restFP(){}function saveAllFP(){}
-async function apiFetch(path,opts={}){const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...opts});if(!res.ok){let m=`HTTP ${res.status}`;try{const j=await res.json();m=j.detail||j.error||m;}catch{}throw new Error(m);}const ct=res.headers.get('content-type')||'';if(ct.includes('application/json'))return res.json();return res.text();}
+async function apiFetch(path,opts={}){const {headers:oh,...rest}=opts;const res=await fetch(API+path,{...rest,headers:{'Content-Type':'application/json',...authHeaders(),...(oh||{})}});if(res.status===401){onAuthFail();throw new Error('No autorizado — se requiere token de acceso');}if(!res.ok){let m=`HTTP ${res.status}`;try{const j=await res.json();m=j.detail||j.error||m;}catch{}throw new Error(m);}const ct=res.headers.get('content-type')||'';if(ct.includes('application/json'))return res.json();return res.text();}
 const A={
   health:()=>apiFetch('/system/health'),preflight:()=>apiFetch('/system/preflight'),info:()=>apiFetch('/system/info'),
+  authStatus:()=>apiFetch('/system/auth-status'),
   procs:()=>apiFetch('/system/processes'),cancelProc:id=>apiFetch(`/system/processes/${id}/cancel`,{method:'POST'}),
   oui:mac=>apiFetch(`/system/oui/${mac}`),
   ouiDownload:()=>apiFetch('/system/oui/download',{method:'POST'}),
@@ -73,15 +83,17 @@ const A={
   addFinding:(sid,b)=>apiFetch(`/sessions/${sid}/findings`,{method:'POST',body:JSON.stringify(b)}),
   updFinding:(sid,fid,b)=>apiFetch(`/sessions/${sid}/findings/${fid}`,{method:'PATCH',body:JSON.stringify(b)}),
   delFinding:(sid,fid)=>apiFetch(`/sessions/${sid}/findings/${fid}`,{method:'DELETE'}),
-  uploadPhoto:(sid,fid,file,caption)=>{const fd=new FormData();fd.append('file',file);fd.append('caption',caption||'');return fetch(`${API}/sessions/${sid}/findings/${fid}/photos`,{method:'POST',body:fd}).then(async r=>{if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||'Error subiendo foto');return r.json();});},
+  uploadPhoto:(sid,fid,file,caption)=>{const fd=new FormData();fd.append('file',file);fd.append('caption',caption||'');return fetch(`${API}/sessions/${sid}/findings/${fid}/photos`,{method:'POST',body:fd,headers:authHeaders()}).then(async r=>{if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||'Error subiendo foto');return r.json();});},
   delPhoto:(sid,fid,pid)=>apiFetch(`/sessions/${sid}/findings/${fid}/photos/${pid}`,{method:'DELETE'}),
-  photoUrl:(sid,fid,pid)=>`${API}/sessions/${sid}/findings/${fid}/photos/${pid}`,
-  pdfUrl:id=>`${API}/sessions/${id}/report/pdf`,
+  photoUrl:(sid,fid,pid)=>withTok(`${API}/sessions/${sid}/findings/${fid}/photos/${pid}`),
+  pdfUrl:id=>withTok(`${API}/sessions/${id}/report/pdf`),
   report:id=>apiFetch(`/sessions/${id}/report`),
   wls:()=>apiFetch('/wordlists'),genWL:b=>apiFetch('/wordlists/generate',{method:'POST',body:JSON.stringify(b)}),
   previewWL:b=>apiFetch('/wordlists/preview',{method:'POST',body:JSON.stringify(b)}),
   estimateWL:b=>apiFetch('/wordlists/estimate',{method:'POST',body:JSON.stringify(b)}),
   delWL:fn=>apiFetch(`/wordlists/${fn}`,{method:'DELETE'}),
+  wlCommonLists:()=>apiFetch('/wordlists/common-lists'),
+  wlImportCommon:key=>apiFetch('/wordlists/import-common/'+key,{method:'POST'}),
   presets:()=>apiFetch('/wordlists/presets/info'),
 };
 function toast(msg,type='info',dur=4000){
@@ -97,6 +109,18 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const lb=docu
 let _cdCb=null;
 function confirmDlg(msg,fn,opts){opts=opts||{};_cdCb=fn;showModal(opts.title||'Confirmar',`<div style="display:flex;gap:11px;align-items:flex-start"><span style="color:var(--${opts.danger===false?'c':'y'});flex-shrink:0;margin-top:1px">${ic(opts.danger===false?'info':'warn',20)}</span><div style="color:var(--t1);font-size:.85rem;line-height:1.65">${msg}</div></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn ${opts.danger===false?'btn-p':'btn-d'}" onclick="runConfirm()">${opts.ok||'Confirmar'}</button>`);}
 function runConfirm(){const cb=_cdCb;_cdCb=null;closeModal();if(cb)cb();}
+// ─── Autenticación por token ───
+let _authPrompting=false;
+function onAuthFail(){if(_authPrompting)return;_authPrompting=true;promptToken(!!AUTH_TOKEN);}
+function promptToken(failed){
+  showModal('Acceso protegido',
+    `<div style="font-size:.83rem;color:var(--t1);line-height:1.6;margin-bottom:13px">${failed?'El token no es válido o ha caducado. ':''}Este servidor WFAudit está protegido. Introduce el <b>token de acceso</b> (el valor de <code>WFAUDIT_TOKEN</code> con el que se arrancó el servidor).</div>
+     <input id="authTok" type="password" class="inp" autocomplete="off" placeholder="Token de acceso" style="width:100%">`,
+    `<button class="btn btn-p" onclick="saveTokenFromModal()">Acceder</button>`);
+  setTimeout(()=>{const i=document.getElementById('authTok');if(i){i.focus();i.onkeydown=e=>{if(e.key==='Enter')saveTokenFromModal();};}},60);
+}
+function saveTokenFromModal(){const i=document.getElementById('authTok');const v=(i&&i.value||'').trim();if(!v){toast('Introduce el token','warn');return;}setToken(v);_authPrompting=false;closeModal();location.reload();}
+function clearToken(){setToken('');toast('Sesión cerrada','info');setTimeout(()=>location.reload(),400);}
 function setC(h){const c=document.getElementById('content');c.innerHTML=h;restoreInputs(c);}
 function setTB(title,sub,acts=''){document.getElementById('tb-title').textContent=title;document.getElementById('tb-sub').textContent=sub;document.getElementById('tb-acts').innerHTML=acts;}
 const SVG={
@@ -142,7 +166,33 @@ function toggleSidebar(){document.body.classList.toggle('nav-open');}
 function closeSidebar(){document.body.classList.remove('nav-open');}
 function setSession(s){ST.activeSession=s;localStorage.setItem('activeSession',JSON.stringify(s));updateSB();}
 function updateSB(){const s=ST.activeSession;document.getElementById('sb-ses-name').textContent=s?s.name:'Sin sesión';const dot=document.getElementById('sb-ses-dot'),st=document.getElementById('sb-ses-st');if(s){const a=s.status==='active';dot.className=`dot ${a?'dot-g':'dot-d'}`;st.textContent=a?'● ACTIVA':'○ CERRADA';st.style.color=a?'var(--g)':'var(--t2)';document.getElementById('sb-ses').textContent=`Sesión: ${s.name}`;}else{dot.className='dot dot-d';st.textContent='Selecciona una sesión';st.style.color='var(--t2)';document.getElementById('sb-ses').textContent='Sin sesión activa';}}
-async function pollProcs(){try{ST.processes=await A.procs();const r=ST.processes.filter(p=>p.status==='running').length;document.getElementById('sb-procs').textContent=`${r} proceso${r!==1?'s':''} activo${r!==1?'s':''}`;const old=document.getElementById('pbadge');if(r>0){if(!old){const ni=document.querySelector('[data-s="system"]');ni&&ni.insertAdjacentHTML('beforeend',`<span class="nbadge" id="pbadge">${r}</span>`);}else old.textContent=r;}else old&&old.remove();}catch{}}
+let _procSeen={};
+function procLabel(cmd){cmd=(cmd||'').toLowerCase();
+  if(cmd.includes('airodump'))return 'Escaneo WiFi';
+  if(cmd.includes('aircrack')||cmd.includes('hashcat'))return 'Crackeo';
+  if(cmd.includes('aireplay'))return 'Deauth';
+  if(cmd.includes('hcxdumptool'))return 'Captura PMKID';
+  if(cmd.includes('arp-scan'))return 'Descubrimiento ARP';
+  if(cmd.includes('nmap'))return 'Escaneo nmap';
+  if(cmd.includes('hostapd'))return 'Evil Twin';
+  if(cmd.includes('mitmdump')||cmd.includes('mitmproxy'))return 'MITM';
+  if(cmd.includes('freeradius'))return 'Enterprise (RADIUS)';
+  if(cmd.includes('macchanger'))return 'Cambio de MAC';
+  return 'Proceso';}
+async function pollProcs(){try{
+  ST.processes=await A.procs();const procs=ST.processes||[];
+  procs.forEach(p=>{
+    if(_procSeen[p.id]==='running'&&p.status!=='running'){
+      const ok=p.status==='completed';
+      toast((ok?'✓ ':'⚠ ')+procLabel(p.command)+(ok?' terminado':' — '+p.status),ok?'success':'warn');
+    }
+    _procSeen[p.id]=p.status;
+  });
+  const ids=new Set(procs.map(p=>p.id));Object.keys(_procSeen).forEach(id=>{if(!ids.has(id))delete _procSeen[id];});
+  const r=procs.filter(p=>p.status==='running').length;
+  document.getElementById('sb-procs').textContent=`${r} proceso${r!==1?'s':''} activo${r!==1?'s':''}`;
+  const old=document.getElementById('pbadge');if(r>0){if(!old){const ni=document.querySelector('[data-s="system"]');ni&&ni.insertAdjacentHTML('beforeend',`<span class="nbadge" id="pbadge">${r}</span>`);}else old.textContent=r;}else old&&old.remove();
+}catch{}}
 async function checkHealth(){try{await A.health();ST.apiOk=true;document.getElementById('apidot').className='ok';document.getElementById('api-txt').textContent='API conectada';}catch{ST.apiOk=false;document.getElementById('apidot').className='err';document.getElementById('api-txt').textContent='API sin conexión';}}
 function startClock(){setInterval(()=>{document.getElementById('sb-time').textContent=new Date().toLocaleTimeString('es-ES');},1000);}
 function swTab(cid,pref,idx){document.querySelectorAll(`#${cid} .tab`).forEach((t,i)=>t.classList.toggle('active',i===idx));document.querySelectorAll(`[id^="${pref}-"]`).forEach((c,i)=>c.classList.toggle('active',i===idx));}

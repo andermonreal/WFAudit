@@ -31,6 +31,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rutas que NUNCA requieren token: sondas de salud y la propia consulta de
+# "¿hace falta token?" (para que el frontend pueda preguntar antes de tenerlo),
+# más la documentación de la API.
+_AUTH_EXEMPT = ("/system/health", "/system/auth-status", "/docs", "/redoc", "/openapi.json")
+
+
+# IMPORTANTE: este middleware de auth se añade ANTES que el de CORS. En Starlette
+# el último middleware añadido queda por fuera, así que CORS envuelve a la auth y
+# hasta una respuesta 401 lleva cabeceras CORS; de lo contrario el navegador vería
+# un error de CORS en lugar del 401 y no podría pedir el token al usuario.
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if (
+        settings.REQUIRE_AUTH
+        and request.method != "OPTIONS"
+        and not request.url.path.startswith(_AUTH_EXEMPT)
+    ):
+        auth = request.headers.get("Authorization", "")
+        token = (
+            auth[7:] if auth.startswith("Bearer ") else ""
+        ) or request.headers.get("X-API-Key", "") or request.query_params.get("token", "")
+        if token != settings.API_KEY:
+            return JSONResponse(status_code=401, content={"detail": "Token de acceso inválido o ausente"})
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,15 +64,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    if settings.REQUIRE_AUTH and not request.url.path.startswith("/docs"):
-        api_key = request.headers.get("X-API-Key")
-        if api_key != settings.API_KEY:
-            return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
-    return await call_next(request)
 
 
 from app.routers.system import router as system_router

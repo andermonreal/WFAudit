@@ -24,6 +24,7 @@ import os
 import random
 import re
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,30 @@ from app.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_accents(s: str) -> str:
+    """josé → jose, muñoz → munoz. Clave para semillas en español."""
+    s = s.replace("ñ", "n").replace("Ñ", "N")
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
+# Ficheros de contraseñas más comunes (SecLists / xato). Se lee el top-N si existen.
+COMMON_PW_FILES = [
+    "/usr/share/SecLists/Passwords/Common-Credentials/xato-net-10-million-passwords-100000.txt",
+    "/usr/share/SecLists/Passwords/Common-Credentials/xato-net-10-million-passwords.txt",
+    "/usr/share/seclists/Passwords/Common-Credentials/xato-net-10-million-passwords-100000.txt",
+    "/usr/share/wordlists/rockyou.txt",
+]
+COMMON_PW_FALLBACK = [
+    "123456", "password", "12345678", "qwerty", "123456789", "12345", "1234",
+    "111111", "1234567", "dragon", "123123", "baseball", "abc123", "football",
+    "monkey", "letmein", "696969", "shadow", "master", "666666", "qwertyuiop",
+    "123321", "mustang", "1234567890", "michael", "654321", "superman", "1qaz2wsx",
+    "7777777", "121212", "000000", "qazwsx", "iloveyou", "admin", "welcome",
+    "login", "princess", "solo", "passw0rd", "starwars", "hola", "amor",
+    "madrid", "barcelona", "españa", "realmadrid", "cristiano", "messi",
+]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -99,6 +124,7 @@ SYMBOL_PAIRS = [
 # Years (full and abbreviated)
 YEARS_FULL = [str(y) for y in range(1950, 2031)]
 YEARS_SHORT = [str(y)[-2:] for y in range(1950, 2031)]
+YEARS_WIDE = [str(y) for y in range(1900, 2051)]   # rango amplio 1900–2050
 YEARS_COMMON = ['2024', '2025', '2026', '2023', '2022', '2021', '2020',
                 '1990', '1991', '1992', '1993', '1994', '1995', '1996',
                 '1997', '1998', '1999', '2000', '2001', '2002', '2003',
@@ -321,28 +347,82 @@ SPANISH_BASE = [
 ]
 
 # COMMON SPANISH FIRST NAMES (top 100 in Spain)
-SPANISH_NAMES = [
-    # Top male names
-    'antonio', 'jose', 'manuel', 'francisco', 'juan', 'david',
-    'javier', 'jesus', 'angel', 'carlos', 'miguel', 'rafael',
-    'pedro', 'sergio', 'fernando', 'jorge', 'alberto', 'luis',
-    'alvaro', 'oscar', 'adrian', 'raul', 'enrique', 'ramon',
-    'pablo', 'andres', 'ruben', 'eduardo', 'roberto', 'mario',
-    'diego', 'alejandro', 'iker', 'hugo', 'daniel', 'cristian',
-    'martin', 'samuel', 'lucas', 'nicolas', 'mateo', 'leo',
-    'gonzalo', 'ivan', 'marcos', 'victor', 'jaime', 'aitor',
-
-    # Top female names
-    'maria', 'carmen', 'ana', 'isabel', 'pilar', 'dolores',
-    'teresa', 'rosa', 'antonia', 'laura', 'cristina', 'marta',
-    'elena', 'mercedes', 'lucia', 'paula', 'sara', 'sofia',
-    'andrea', 'patricia', 'silvia', 'beatriz', 'natalia',
-    'raquel', 'monica', 'irene', 'rocio', 'noelia', 'carolina',
-    'sandra', 'nuria', 'angela', 'celia', 'alicia', 'julia',
-    'valeria', 'martina', 'alba', 'marina', 'claudia', 'eva',
-    'olivia', 'mar', 'salma', 'carla', 'daniela', 'emma',
-    'aitana', 'clara', 'lola', 'noa', 'vega',
+_SN_MALE = [
+    'antonio', 'jose', 'manuel', 'francisco', 'juan', 'david', 'javier', 'jesus', 'angel',
+    'carlos', 'miguel', 'rafael', 'pedro', 'sergio', 'fernando', 'jorge', 'alberto', 'luis',
+    'alvaro', 'oscar', 'adrian', 'raul', 'enrique', 'ramon', 'pablo', 'andres', 'ruben',
+    'eduardo', 'roberto', 'mario', 'diego', 'alejandro', 'iker', 'hugo', 'daniel', 'cristian',
+    'martin', 'samuel', 'lucas', 'nicolas', 'mateo', 'leo', 'gonzalo', 'ivan', 'marcos',
+    'victor', 'jaime', 'aitor', 'ignacio', 'agustin', 'arturo', 'felix', 'felipe', 'guillermo',
+    'gregorio', 'joaquin', 'julian', 'lorenzo', 'marcelo', 'mauricio', 'maximo', 'octavio',
+    'patricio', 'ricardo', 'rodrigo', 'salvador', 'saul', 'teodoro', 'tomas', 'valentin',
+    'vicente', 'emilio', 'esteban', 'ezequiel', 'gabriel', 'german', 'gustavo', 'hector',
+    'isaac', 'isidro', 'ismael', 'jonathan', 'josep', 'kevin', 'leandro', 'marc', 'matias',
+    'moises', 'nestor', 'noe', 'omar', 'pau', 'sebastian', 'simon', 'unai', 'xavier', 'yago',
+    'abel', 'aaron', 'alan', 'aldo', 'alfonso', 'alfredo', 'anibal', 'aurelio', 'benito',
+    'bernardo', 'bruno', 'camilo', 'cesar', 'claudio', 'damian', 'dario', 'domingo', 'edgar',
+    'eloy', 'elias', 'eneko', 'ernesto', 'eugenio', 'fabian', 'ferran', 'franco', 'gael',
+    'gerardo', 'gines', 'hilario', 'horacio', 'humberto', 'ibai', 'izan', 'jacobo', 'jairo',
+    'jan', 'jonas', 'josue', 'juanjo', 'luciano', 'lucio', 'mariano', 'maximiliano', 'nilo',
+    'norberto', 'rene', 'sancho', 'santiago', 'saturnino', 'sixto', 'telmo', 'tobias', 'ulises',
+    'yeray', 'zacarias',
 ]
+_SN_FEMALE = [
+    'maria', 'carmen', 'ana', 'isabel', 'pilar', 'dolores', 'teresa', 'rosa', 'antonia',
+    'laura', 'cristina', 'marta', 'elena', 'mercedes', 'lucia', 'paula', 'sara', 'sofia',
+    'andrea', 'patricia', 'silvia', 'beatriz', 'natalia', 'raquel', 'monica', 'irene', 'rocio',
+    'noelia', 'carolina', 'sandra', 'nuria', 'angela', 'celia', 'alicia', 'julia', 'valeria',
+    'martina', 'alba', 'marina', 'claudia', 'eva', 'olivia', 'mar', 'salma', 'carla', 'daniela',
+    'emma', 'aitana', 'clara', 'lola', 'noa', 'vega', 'adriana', 'africa', 'aida', 'ainara',
+    'ainhoa', 'alejandra', 'almudena', 'amaia', 'amalia', 'amanda', 'amelia', 'amparo', 'anabel',
+    'angeles', 'aroa', 'aurora', 'azucena', 'barbara', 'belen', 'berta', 'blanca', 'brenda',
+    'camila', 'candela', 'caridad', 'catalina', 'cayetana', 'cecilia', 'consuelo', 'covadonga',
+    'dafne', 'debora', 'diana', 'dorotea', 'edurne', 'elisa', 'elsa', 'elvira', 'emilia',
+    'encarna', 'esperanza', 'estefania', 'estela', 'esther', 'estrella', 'fabiola', 'fatima',
+    'fernanda', 'flora', 'francisca', 'gabriela', 'gema', 'gloria', 'gracia', 'guadalupe',
+    'ines', 'ingrid', 'iria', 'iris', 'itziar', 'jenifer', 'jimena', 'josefa', 'josefina',
+    'juana', 'judith', 'leire', 'leonor', 'leticia', 'lidia', 'lorena', 'loreto', 'lourdes',
+    'luisa', 'luz', 'macarena', 'magdalena', 'manuela', 'marcela', 'margarita', 'mariana',
+    'maribel', 'marisa', 'marisol', 'matilde', 'maya', 'milagros', 'miriam', 'montse', 'nadia',
+    'nayara', 'nerea', 'nieves', 'norma', 'ofelia', 'olga', 'paloma', 'paola', 'paz', 'penelope',
+    'petra', 'rafaela', 'ramona', 'rebeca', 'remedios', 'reyes', 'ruth', 'sabrina', 'samanta',
+    'saray', 'selena', 'socorro', 'soledad', 'susana', 'tamara', 'tania', 'tatiana', 'vanesa',
+    'veronica', 'victoria', 'violeta', 'virginia', 'viviana', 'ximena', 'yaiza', 'yolanda',
+    'zaira', 'zoe',
+]
+
+_SN_DIMIN = [
+    'pepe', 'paco', 'manolo', 'curro', 'nacho', 'kike', 'quique', 'chema', 'chus', 'lucho',
+    'toni', 'rafa', 'santi', 'edu', 'fran', 'guille', 'javi', 'juanma', 'juancar', 'juanjo',
+    'josema', 'chuchi', 'goyo', 'lalo', 'memo', 'moncho', 'nando', 'nano', 'poncho', 'tino',
+    'lola', 'lolita', 'charo', 'concha', 'conchi', 'pili', 'mari', 'chelo', 'tere', 'maite',
+    'mayte', 'bea', 'cris', 'inma', 'loli', 'mamen', 'marisa', 'merche', 'nati', 'pepa',
+    'puri', 'reme', 'rosi', 'sole', 'trini', 'vero', 'juanito', 'luisito', 'pepito', 'manoli',
+]
+
+def _build_spanish_names() -> list:
+    """Base + diminutivos + nombres COMPUESTOS reales muy comunes en España (josemaria, juanjose…)."""
+    names = list(dict.fromkeys(_SN_MALE + _SN_FEMALE + _SN_DIMIN))
+    compounds = {
+        'jose': ['maria', 'luis', 'antonio', 'manuel', 'miguel', 'ramon', 'angel', 'ignacio',
+                 'carlos', 'francisco', 'javier', 'pablo', 'andres'],
+        'juan': ['jose', 'carlos', 'manuel', 'antonio', 'francisco', 'pablo', 'luis', 'pedro',
+                 'ramon', 'ignacio', 'diego', 'cruz'],
+        'maria': ['jose', 'carmen', 'luisa', 'angeles', 'pilar', 'teresa', 'isabel', 'dolores',
+                  'jesus', 'victoria', 'mar', 'elena', 'rosa', 'cristina', 'luz', 'paz', 'nieves',
+                  'belen', 'jose', 'antonia', 'concepcion'],
+        'miguel': ['angel'], 'luis': ['miguel', 'maria', 'antonio', 'alberto'],
+        'jesus': ['maria', 'angel'], 'francisco': ['javier', 'jose', 'manuel'],
+        'antonio': ['jose', 'manuel', 'jesus'], 'ana': ['maria', 'isabel', 'belen', 'rosa', 'cristina'],
+        'jose': ['maria', 'luis', 'antonio', 'manuel', 'miguel', 'ramon', 'angel', 'ignacio'],
+        'carlos': ['alberto', 'jose'], 'manuel': ['jesus', 'jose', 'antonio'],
+    }
+    for first, seconds in compounds.items():
+        for sec in seconds:
+            names.append(first + sec)
+    return list(dict.fromkeys(names))
+
+SPANISH_NAMES = _build_spanish_names()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -367,6 +447,7 @@ class GeneratorConfig:
     use_stretching: bool = False            # ander → aannddeerr
     use_reverse: bool = True                # ander → redna
     use_palindrome: bool = False            # ander → anderredna
+    use_strip_accents: bool = True          # josé → jose (añade la variante sin acentos)
 
     # NEW: Number infix (digits between letters)
     use_number_infix: bool = True
@@ -391,7 +472,10 @@ class GeneratorConfig:
     # Common base words
     add_common_base: bool = True
     add_spanish_base: bool = True
-    add_spanish_names: bool = True           # NEW: 100+ Spanish first names
+    add_spanish_names: bool = True           # NEW: 1000+ Spanish first names
+    add_common_passwords: bool = False       # NEW: top-N contraseñas más comunes (xato/SecLists)
+    common_passwords_count: int = 10000
+    use_wide_years: bool = False             # NEW: años 1900–2050 (además de birth_years)
 
     # Length filters
     min_length: int = 6
@@ -582,7 +666,10 @@ class WordlistGenerator:
     def _year_suffixes(self) -> Iterator[str]:
         if not self.cfg.use_years:
             return
-        if self.cfg.use_birth_years:
+        if self.cfg.use_wide_years:
+            yield from YEARS_WIDE
+            yield from YEARS_SHORT
+        elif self.cfg.use_birth_years:
             yield from YEARS_FULL
             yield from YEARS_SHORT
         else:
@@ -659,9 +746,37 @@ class WordlistGenerator:
                     self._write(fh, base + num + sym)
                     self._write(fh, base + sym + num)
 
+        # Año + símbolo (cuchara2023!) — patrón muy frecuente en fugas reales
+        if self.cfg.use_years and self.cfg.use_symbols:
+            for year in YEARS_COMMON:
+                for sym in SYMBOLS[:5]:
+                    self._write(fh, base + year + sym)
+
+    def _expand_seeds(self, seeds: list[str]) -> list[str]:
+        """Añade la variante sin acentos de cada semilla (josé → jose), deduplicada."""
+        if not self.cfg.use_strip_accents:
+            return seeds
+        out: list[str] = []
+        for s in seeds:
+            if s not in out:
+                out.append(s)
+            st = _strip_accents(s)
+            if st and st.lower() != s.lower() and st not in out:
+                out.append(st)
+        return out
+
     def _generate_combinations(self, words: list[str], fh):
-        """Combine seed words: pairs and (optionally) triples."""
-        if not self.cfg.combine_words or len(words) < 2:
+        """Combine seed words: repetition, pairs and (optionally) triples."""
+        if not self.cfg.combine_words:
+            return
+
+        # REPETICIÓN de una misma semilla (anderander, AnderAnder) — muy común
+        for w in words:
+            if 1 < len(w) <= 12:
+                self._apply_appendages(w.lower() + w.lower(), fh)
+                self._write(fh, w.capitalize() + w.capitalize())
+
+        if len(words) < 2:
             return
 
         # PAIRS — full appendages
@@ -670,16 +785,30 @@ class WordlistGenerator:
                 (w1.lower(), w2.lower()),
                 (w1.capitalize(), w2.capitalize()),
                 (w1.upper(), w2.upper()),
-                (w1.lower(), w2.capitalize()),  # Mixed
+                (w1.lower(), w2.capitalize()),  # Mixed (camelCase)
                 (w1.capitalize(), w2.lower()),
             ]:
                 combined = v1 + v2
                 if combined:
                     self._apply_appendages(combined, fh)
+                    # leet sobre la combinación (una variante, controla la explosión)
+                    if self.cfg.use_leet:
+                        for lv in itertools.islice(self._leet_variants(combined.lower()), 2):
+                            self._write(fh, lv)
+                    # combinación invertida (anderibai → iabirdna)
+                    if self.cfg.use_reverse_combine and len(combined) > 2:
+                        self._write(fh, combined[::-1])
 
                 if self.cfg.use_separators:
                     for sep in ['_', '.', '-', '+', '@', '#']:
                         self._write(fh, v1 + sep + v2)
+
+            # año/número entre las dos palabras (ander2024ibai) — patrón muy común
+            if self.cfg.use_years:
+                a, b = w1.lower(), w2.lower()
+                for year in YEARS_COMMON[:12]:
+                    self._write(fh, a + year + b)
+                self._write(fh, w1.capitalize() + "2024" + w2.capitalize())
 
         # TRIPLES — limited appendages to control explosion
         if self.cfg.combine_3_words and len(words) >= 3:
@@ -723,6 +852,27 @@ class WordlistGenerator:
                         except Exception:
                             continue
 
+    def _add_common_passwords(self, fh):
+        """Añade las top-N contraseñas más comunes (del fichero de SecLists si existe)."""
+        n = max(0, int(self.cfg.common_passwords_count or 0))
+        if n <= 0:
+            return
+        src = next((p for p in COMMON_PW_FILES if os.path.isfile(p)), None)
+        if src:
+            try:
+                with open(src, "r", encoding="utf-8", errors="ignore") as f:
+                    for i, line in enumerate(f):
+                        if i >= n:
+                            break
+                        pw = line.rstrip("\r\n")
+                        if pw:
+                            self._write(fh, pw)
+                return
+            except Exception as e:
+                logger.warning(f"common passwords read failed: {e}")
+        for pw in COMMON_PW_FALLBACK:
+            self._write(fh, pw)
+
     # ─── Public API ───
 
     async def generate(self, progress_cb=None) -> dict:
@@ -738,6 +888,7 @@ class WordlistGenerator:
         seeds = [w.strip() for w in self.cfg.seed_words if w.strip()]
         if not seeds:
             return {"error": "No seed words provided"}
+        seeds = self._expand_seeds(seeds)
 
         logger.info(f"Wordlist generation: {len(seeds)} seeds → {out_path}")
 
@@ -757,47 +908,43 @@ class WordlistGenerator:
                     self._generate_combinations(seeds, fh)
                     await asyncio.sleep(0)
 
-                    # Phase 3: Common base words ⨉ seeds
+                    # Phase 3: palabras base comunes STANDALONE (con appendages).
+                    # Antes se cruzaban con cada semilla (base+seed, seed+base) y
+                    # generaba candidatas absurdas como "adminander" — eliminado.
                     if self.cfg.add_common_base:
                         for base_word in COMMON_BASE_WORDS:
-                            for seed in seeds:
-                                self._write(fh, base_word + seed.lower())
-                                self._write(fh, seed.lower() + base_word)
-                                self._write(fh, base_word.capitalize() + seed.capitalize())
-                                self._write(fh, seed.capitalize() + base_word.capitalize())
                             self._apply_appendages(base_word, fh)
+                            self._write(fh, base_word.capitalize())
                         await asyncio.sleep(0)
 
-                    # Phase 4: Spanish base words
+                    # Phase 4: palabras base en español STANDALONE
                     if self.cfg.add_spanish_base:
                         for base_word in SPANISH_BASE:
-                            # Skip non-ASCII words for safety
-                            if any(ord(c) > 127 for c in base_word):
-                                # Add original with accents AND ASCII version
-                                for seed in seeds:
-                                    self._write(fh, base_word + seed.lower())
-                                    self._write(fh, seed.lower() + base_word)
-                            else:
-                                for seed in seeds:
-                                    self._write(fh, base_word + seed.lower())
-                                    self._write(fh, seed.lower() + base_word)
-                                    self._write(fh, base_word.capitalize() + seed.capitalize())
-                            # Spanish word standalone with appendages (light)
                             self._apply_appendages(base_word, fh)
+                            if not any(ord(c) > 127 for c in base_word):
+                                self._write(fh, base_word.capitalize())
+                            else:
+                                self._apply_appendages(_strip_accents(base_word), fh)
                         await asyncio.sleep(0)
 
-                    # Phase 5: Spanish first names
+                    # Phase 5: nombres españoles STANDALONE + años/números (muy común)
                     if self.cfg.add_spanish_names:
+                        year_pool = YEARS_FULL if self.cfg.use_birth_years else YEARS_COMMON
                         for name in SPANISH_NAMES:
-                            for seed in seeds:
-                                self._write(fh, name + seed.lower())
-                                self._write(fh, seed.lower() + name)
-                                self._write(fh, name.capitalize() + seed.capitalize())
-                            # Names with year suffixes (very common)
+                            self._write(fh, name)
+                            self._write(fh, name.capitalize())
                             if self.cfg.use_years:
-                                for year in YEARS_COMMON[:20]:
+                                for year in year_pool:
                                     self._write(fh, name + year)
                                     self._write(fh, name.capitalize() + year)
+                            if self.cfg.use_numbers:
+                                for num in NUMBERS_2[:100]:
+                                    self._write(fh, name.capitalize() + num)
+                        await asyncio.sleep(0)
+
+                    # Phase 6: top-N contraseñas más comunes (xato/SecLists)
+                    if self.cfg.add_common_passwords:
+                        self._add_common_passwords(fh)
                         await asyncio.sleep(0)
 
                 except StopIteration:
@@ -884,7 +1031,7 @@ class PreviewGenerator(WordlistGenerator):
                 samples_by_category["case"].append(v)
 
             # Leet
-            for v in list(self._leet_variants(seed.lower()))[:8]:
+            for v in list(self._leet_variants(seed.lower()))[:16]:
                 samples_by_category["leet"].append(v)
 
             # Doubling
@@ -892,20 +1039,20 @@ class PreviewGenerator(WordlistGenerator):
                 samples_by_category["doubling"].append(v)
 
             # Infix
-            for v in list(self._infix_variants(seed))[:8]:
+            for v in list(self._infix_variants(seed))[:16]:
                 samples_by_category["infix"].append(v)
 
             # Number appendages
-            for num in NUMBERS_2[:5]:
+            for num in NUMBERS_2[:12]:
                 samples_by_category["appendage_numbers"].append(seed.lower() + num)
             samples_by_category["appendage_numbers"].append(seed.lower() + "1234")
 
             # Symbol appendages
             if self.cfg.use_symbols:
-                for sym in SYMBOLS[:5]:
+                for sym in SYMBOLS[:10]:
                     samples_by_category["appendage_symbols"].append(seed.lower() + sym)
                 if self.cfg.use_symbol_pairs:
-                    for pair in SYMBOL_PAIRS[:3]:
+                    for pair in SYMBOL_PAIRS[:6]:
                         samples_by_category["appendage_symbols"].append(seed.lower() + pair)
 
             # Year appendages
@@ -913,34 +1060,46 @@ class PreviewGenerator(WordlistGenerator):
                 for year in ['2024', '2025', '2008', '1995', '99']:
                     samples_by_category["appendage_years"].append(seed.lower() + year)
 
-            # Combinations
-            if self.cfg.combine_words and len(seeds) >= 2:
-                samples_by_category["combinations"].append(seeds[0].lower() + seeds[1].lower())
-                samples_by_category["combinations"].append(seeds[0].capitalize() + seeds[1].capitalize())
-                samples_by_category["combinations"].append(seeds[0].lower() + "_" + seeds[1].lower())
-                samples_by_category["combinations"].append(seeds[1].lower() + seeds[0].lower() + "123")
+            # Accents stripped (revisa cualquier semilla con tildes/ñ)
+            if self.cfg.use_strip_accents:
+                for sd in seeds:
+                    st = _strip_accents(sd)
+                    if st.lower() != sd.lower():
+                        samples_by_category["accents"] = [st, st.capitalize(), st.lower() + "2024"]
+                        break
+
+            # Combinations (repetición, pares, invertida)
+            if self.cfg.combine_words:
+                samples_by_category["combinations"].append(seed.lower() + seed.lower())
+                if len(seeds) >= 2:
+                    samples_by_category["combinations"].append(seeds[0].lower() + seeds[1].lower())
+                    samples_by_category["combinations"].append(seeds[0].capitalize() + seeds[1].capitalize())
+                    samples_by_category["combinations"].append(seeds[0].lower() + "_" + seeds[1].lower())
+                    samples_by_category["combinations"].append(seeds[0].lower() + seeds[1].capitalize() + "2024")
+                    if self.cfg.use_reverse_combine:
+                        samples_by_category["combinations"].append((seeds[0].lower() + seeds[1].lower())[::-1])
             if self.cfg.combine_3_words and len(seeds) >= 3:
                 samples_by_category["combinations"].append(seeds[0].lower() + seeds[1].lower() + seeds[2].lower())
                 samples_by_category["combinations"].append(seeds[0].capitalize() + seeds[1].capitalize() + seeds[2].capitalize())
 
-            # Spanish base
+            # Spanish base (STANDALONE con appendages, no cruzado con semillas)
             if self.cfg.add_spanish_base:
-                for sb in ['casa', 'amor', 'familia']:
-                    samples_by_category["spanish"].append(sb + seed.lower())
-                    samples_by_category["spanish"].append(seed.lower() + sb)
+                for sb in ['casa', 'amor', 'familia', 'madrid', 'barca']:
+                    samples_by_category["spanish"].append(sb.capitalize() + '2024')
+                    samples_by_category["spanish"].append(sb + '123!')
 
-            # Spanish names
+            # Spanish names (standalone + año/número)
             if self.cfg.add_spanish_names:
-                for name in ['maria', 'juan', 'sofia']:
-                    samples_by_category["names"].append(name + seed.lower())
-                    samples_by_category["names"].append(seed.lower() + name + '2024')
+                for name in ['maria', 'juan', 'sofia', 'carlos']:
+                    samples_by_category["names"].append(name.capitalize() + '2024')
+                    samples_by_category["names"].append(name + '1995')
 
             # Filter empties and dedupe within category
             for k in samples_by_category:
                 samples_by_category[k] = [
                     s for s in dict.fromkeys(samples_by_category[k]).keys()
                     if self.cfg.min_length <= len(s) <= self.cfg.max_length
-                ][:8]
+                ][:14]
 
             # Compose flat samples list
             flat = []
@@ -958,6 +1117,38 @@ class PreviewGenerator(WordlistGenerator):
 # ═══════════════════════════════════════════════════════════
 # WORDLIST MANAGER
 # ═══════════════════════════════════════════════════════════
+
+class CountingGenerator(WordlistGenerator):
+    """Dry-run: cuenta EXACTAMENTE las candidatas únicas (con dedup y filtros de
+    longitud), sin escribir a disco, hasta un tope. Da una estimación precisa."""
+
+    def __init__(self, config: GeneratorConfig, cap: int = 2_000_000):
+        super().__init__(config)
+        self._cap = cap
+        self.capped = False
+
+    def _write(self, fh, word: str):
+        if self._accept(word):
+            self.count += 1
+            if self.count >= self._cap:
+                self.capped = True
+                raise StopIteration
+
+    async def count_unique(self) -> tuple:
+        # Reutiliza generate() (todas las fases) pero _write no escribe, solo cuenta.
+        self.cfg.output_filename = "._estimate_tmp.txt"
+        prev_max = self.cfg.max_total
+        self.cfg.max_total = self._cap
+        try:
+            await self.generate()
+        finally:
+            self.cfg.max_total = prev_max
+            try:
+                (settings.WORDLISTS_DIR / "._estimate_tmp.txt").unlink()
+            except Exception:
+                pass
+        return self.count, self.capped
+
 
 class WordlistService:
     _running_jobs: dict = {}
@@ -1042,85 +1233,35 @@ class WordlistService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def estimate(self, params: dict) -> dict:
+    async def estimate(self, params: dict) -> dict:
+        """Estimación PRECISA por dry-run: cuenta candidatas únicas reales
+        (dedup + filtros de longitud + todas las mutaciones), hasta un tope."""
         config = GeneratorConfig(**{k: v for k, v in params.items() if k in GeneratorConfig.__dataclass_fields__})
         seeds = [w.strip() for w in config.seed_words if w.strip()]
-        n = len(seeds)
-        if n == 0:
-            return {"estimated_count": 0, "estimated_size_bytes": 0}
-
-        # Per-seed mutations
-        per_seed = 1
-        if config.use_lowercase: per_seed += 1
-        if config.use_uppercase: per_seed += 1
-        if config.use_capitalize: per_seed += 2
-        if config.use_alternating_case: per_seed += 2
-        if config.use_leet:
-            if config.leet_intensity == "low": per_seed += 8
-            elif config.leet_intensity == "medium": per_seed += 30
-            else: per_seed += 80
-        if config.use_doubling: per_seed += 8
-        if config.use_stretching: per_seed += 2
-        if config.use_reverse: per_seed += 3
-        if config.use_palindrome: per_seed += 2
-        if config.use_number_infix: per_seed += 35  # ~6 digits * ~6 positions
-
-        # Appendages per base
-        appendages = 1
-        if config.use_symbols:
-            appendages += len(SYMBOLS)
-            if config.use_double_symbols: appendages += len(SYMBOLS) * 2
-            if config.use_symbol_pairs: appendages += len(SYMBOL_PAIRS)
-            appendages += 8  # prefix symbols
-        if config.use_numbers:
-            if config.number_max_length == 1: appendages += 10
-            elif config.number_max_length == 2: appendages += 110
-            elif config.number_max_length == 3: appendages += 1110
-            elif config.number_max_length == 4: appendages += 11110
-        if config.use_years:
-            if config.use_birth_years: appendages += 162
-            else: appendages += len(YEARS_COMMON)
-        appendages += len(COMMON_SUFFIXES)
-        appendages += 8  # common prefixes
-        if config.use_numbers and config.use_symbols: appendages += 180
-
-        # Per-seed total
-        per_seed_total = per_seed * appendages
-
-        # Combinations (n*(n-1)) for pairs * mutations
-        combos = 0
-        if config.combine_words and n >= 2:
-            combos = n * (n - 1) * 5 * appendages  # 5 case variants
-            if config.use_separators: combos += n * (n - 1) * 6  # separators
-            if config.combine_3_words and n >= 3:
-                triples = n * (n - 1) * (n - 2) * 3
-                triples *= (50 + (200 if config.number_max_length >= 4 else 0) + len(YEARS_COMMON) + 30 + 8)
-                combos += triples
-
-        # Common base words
-        base_count = 0
-        if config.add_common_base:
-            base_count += len(COMMON_BASE_WORDS) * (n * 4 + appendages)
-        if config.add_spanish_base:
-            base_count += len(SPANISH_BASE) * (n * 3 + appendages // 2)
-        if config.add_spanish_names:
-            base_count += len(SPANISH_NAMES) * (n * 3 + (20 if config.use_years else 0))
-
-        total_est = per_seed_total * n + combos + base_count
-        # Account for dedup (assume 30-40% are dupes)
-        total_est = int(total_est * 0.65)
-        # Cap at max_total
-        total_est = min(total_est, config.max_total)
-
-        size_est = total_est * 13  # avg 12 chars + newline
-
+        if not seeds:
+            return {"estimated_count": 0, "estimated_count_human": "0", "estimated_size_bytes": 0,
+                    "estimated_size_human": "0 B", "estimated_time_seconds": 0, "exact": True}
+        cap = min(config.max_total, 3_000_000)
+        counter = CountingGenerator(config, cap=cap)
+        try:
+            count, capped = await counter.count_unique()
+        except Exception as e:
+            logger.warning(f"estimate dry-run failed: {e}")
+            count, capped = 0, False
+        seen = counter.seen
+        avg = (sum(len(w) for w in seen) / len(seen)) if seen else 12.0
+        est = count
+        over = capped and config.max_total > cap
+        if over:
+            est = config.max_total
+        size = int(est * (avg + 1))
         return {
-            "estimated_count": total_est,
-            "estimated_count_human": f"{total_est:,}",
-            "estimated_size_bytes": size_est,
-            "estimated_size_human": WordlistGenerator._human_size(size_est),
-            "estimated_time_seconds": max(2, total_est // 200_000),
+            "estimated_count": est,
+            "estimated_count_human": f"{est:,}" + ("+" if over else ""),
+            "estimated_size_bytes": size,
+            "estimated_size_human": WordlistGenerator._human_size(size),
+            "estimated_time_seconds": max(1, est // 300_000),
+            "exact": not capped,
         }
-
 
 wordlist_service = WordlistService()

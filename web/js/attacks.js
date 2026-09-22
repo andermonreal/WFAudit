@@ -42,7 +42,7 @@ async function doMitmStart(){const i=document.getElementById('mitm-if')?.value,g
 async function doMitmStop(){try{await A.mitmStop();toast('MITM detenido','success');pollAttSt();}catch(e){toast(e.message,'error');}}
 async function showCaCert(){showModal('Certificado CA de mitmproxy',`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Consultando...</div>`,'',false);try{const d=await A.mitmCaCert();const certs=d.certs||{},fmt=[['pem','PEM','Android · Linux · macOS'],['cer','CER','iOS · Windows'],['p12','PKCS12','Windows']];const ins=d.instructions||{};const anyGen=Object.values(certs).some(c=>c.exists);const body=`${!anyGen?`<div class="alert aw" style="margin-bottom:12px">${ic('warn')}<div>El certificado aún no existe. Ejecuta una vez el MITM (o <span class="hcode">mitmdump</span>) para generarlo en <span class="mono">${d.cert_dir||'~/.mitmproxy'}</span>.</div></div>`:`<div class="alert ai" style="margin-bottom:12px">${ic('info')}<div>Instala este certificado en el dispositivo víctima <strong>antes</strong> de usar el modo full para evitar avisos de HTTPS.</div></div>`}
   <div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Descargas</div>
-  <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${fmt.map(([f,l,plat])=>{const ex=certs[`mitmproxy-ca-cert.${f}`]?.exists;return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border:1px solid var(--b0);border-radius:8px"><span class="badge ${ex?'b-g':'b-x'}">${f.toUpperCase()}</span><div style="flex:1;min-width:0"><div style="font-size:.78rem;font-weight:600">${l}</div><div style="font-size:.66rem;color:var(--t2)">${plat}</div></div>${ex?`<a class="btn btn-p btn-sm" href="${API}/attacks/mitm/ca-cert/download/${f}" target="_blank" download>${ic('download',12)} Descargar</a>`:`<span class="badge b-x">no generado</span>`}</div>`;}).join('')}</div>
+  <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${fmt.map(([f,l,plat])=>{const ex=certs[`mitmproxy-ca-cert.${f}`]?.exists;return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg3);border:1px solid var(--b0);border-radius:8px"><span class="badge ${ex?'b-g':'b-x'}">${f.toUpperCase()}</span><div style="flex:1;min-width:0"><div style="font-size:.78rem;font-weight:600">${l}</div><div style="font-size:.66rem;color:var(--t2)">${plat}</div></div>${ex?`<a class="btn btn-p btn-sm" href="${withTok(`${API}/attacks/mitm/ca-cert/download/${f}`)}" target="_blank" download>${ic('download',12)} Descargar</a>`:`<span class="badge b-x">no generado</span>`}</div>`;}).join('')}</div>
   <div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Instalación por sistema</div>
   ${[['Android','android','🤖'],['iOS','ios','🍎'],['Windows','windows','🪟'],['Linux','linux','🐧']].map(([l,k,ico])=>ins[k]?`<div style="margin-bottom:9px"><div style="font-size:.74rem;font-weight:600;margin-bottom:3px">${ico} ${l}</div><div style="font-size:.72rem;color:var(--t1);line-height:1.6;padding-left:4px">${ins[k]}</div></div>`:'').join('')}`;showModal('Certificado CA de mitmproxy',body,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`,true);}catch(e){toast(e.message,'error');closeModal();}}
 async function loadFlows(){const cr=document.getElementById('fl-cr')?.checked||false;const el=document.getElementById('fl-table');if(!el)return;try{const[ef,mf]=await Promise.all([A.etFlows(50).catch(()=>null),A.mitmFlows(50,cr).catch(()=>null)]);const all=[...((ef?.flows)||[]),...((mf?.flows)||[])].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));if(!all.length){el.innerHTML=`<div class="empty" style="padding:24px">${ic('search',30)}<h3>Sin flujos</h3></div>`;return;}el.innerHTML=`<div class="twrap"><table><thead><tr><th>Hora</th><th>Tipo</th><th>Cliente</th><th>Host</th><th>Método</th><th>Estado</th></tr></thead><tbody>${all.slice(0,50).map(f=>`<tr ${f.has_credentials?'style="background:var(--r2)"':''}><td class="mono" style="font-size:.66rem;color:var(--t2)">${fd(f.timestamp)}</td><td><span class="badge ${f.type==='http'?'b-o':f.type==='dns'?'b-c':'b-p'}">${f.type||'—'}</span></td><td class="mono" style="font-size:.7rem">${f.client_ip||'—'}</td><td style="font-size:.76rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.host||'—'}</td><td class="mono" style="font-size:.7rem">${f.method||'—'}</td><td>${f.has_credentials?`<span class="badge b-r">CREDS</span>`:`<span class="badge b-x">${f.status_code||'—'}</span>`}</td></tr>`).join('')}</tbody></table></div>`;}catch(e){toast(e.message,'error');}}
@@ -86,15 +86,17 @@ async function wordlists(){
     {grp:'Mutaciones de letras',items:[
       {id:'use_leet',        l:'Leet speak',         ex:'empresa → 3mpr3s4',          d:'Sustituye letras por números/símbolos (e→3, a→4)', def:true},
       {id:'use_number_infix',l:'Número intercalado', ex:'ander → an1der',             d:'Inserta un número entre las letras de la palabra',  def:true},
-      {id:'use_doubling',    l:'Duplicar',           ex:'empresa → empresaempresa',   d:'Repite la palabra dos veces',                      def:false},
+      {id:'use_doubling',    l:'Duplicar letras',    ex:'ander → aander, anderr',     d:'Duplica la primera y/o última letra',              def:false},
       {id:'use_stretching',  l:'Estirar',            ex:'ola → oolllaaa',             d:'Repite caracteres consecutivos (muy explosivo)',    def:false},
       {id:'use_reverse',     l:'Reverso',            ex:'empresa → aserpme',          d:'Invierte el orden de los caracteres',               def:false},
       {id:'use_palindrome',  l:'Palíndromo',         ex:'sol → sollos',               d:'Concatena la palabra con su reverso',               def:false},
+      {id:'use_strip_accents',l:'Quitar acentos',    ex:'josé → jose',                d:'Añade la variante sin tildes ni ñ (clave en español)',def:true},
     ]},
     {grp:'Números',items:[
       {id:'use_numbers',     l:'Sufijos numéricos',  ex:'empresa → empresa123',       d:'Añade secuencias de números al final',              def:true},
       {id:'use_years',       l:'Años',               ex:'empresa → empresa2024',      d:'Añade años comunes: 2020, 2021 … 2030',            def:true},
-      {id:'use_birth_years', l:'Años de nacimiento', ex:'empresa → empresa1985',      d:'Añade años típicos de nacimiento (1950-2010)',      def:true},
+      {id:'use_birth_years', l:'Años de nacimiento', ex:'empresa → empresa1985',      d:'Añade años típicos de nacimiento (1950-2030)',      def:true},
+      {id:'use_wide_years',  l:'Años 1900–2050',     ex:'empresa → empresa1972',      d:'Rango amplio completo de años (1900 a 2050)',       def:false},
     ]},
     {grp:'Símbolos',items:[
       {id:'use_symbols',     l:'Símbolos',           ex:'empresa → empresa!',         d:'Añade !, @, #, $ … al final de la palabra',        def:true},
@@ -110,7 +112,8 @@ async function wordlists(){
     {grp:'Palabras base',items:[
       {id:'add_common_base', l:'Base común',         ex:'→ password, admin, 123456…', d:'Añade contraseñas comunes universales',             def:true},
       {id:'add_spanish_base',l:'Base española',      ex:'→ contraseña, acceso…',      d:'Añade ~250 palabras comunes en español',            def:false},
-      {id:'add_spanish_names',l:'Nombres españoles', ex:'→ Juan, María, Carlos…',     d:'Añade los 100 nombres más frecuentes en España',   def:false},
+      {id:'add_spanish_names',l:'Nombres españoles', ex:'→ Juan, María, JoseMaria…',  d:'~450 nombres reales (incl. compuestos) + año/número',def:false},
+      {id:'add_common_passwords',l:'Contraseñas comunes',ex:'→ 123456, password…',    d:'Añade las N contraseñas más usadas (xato/SecLists)',def:false},
     ]},
   ];
   setC(`<div class="sup"><div class="tabs" id="wl-tabs"><div class="tab active" onclick="swTab('wl-tabs','wl-tc',0)">${ic('zap',13)} Generar</div><div class="tab" onclick="swTab('wl-tabs','wl-tc',1)">${ic('download',13)} Diccionarios existentes (${wls.total||0})</div></div>
@@ -141,17 +144,35 @@ async function wordlists(){
         ${g.grp==='Mutaciones de letras'?`<div class="frow" style="margin:8px 0 0"><label>Intensidad Leet <span class="tip" data-tip="Baja: sustituciones básicas (a→4, e→3, o→0). Media: añade i→1, s→5, t→7. Alta: todas las variantes posibles por letra (mucho más explosivo).">?</span></label><select id="wl-leet" class="inp" data-p><option value="low">Baja</option><option value="medium" selected>Media</option><option value="high">Alta</option></select></div>`:''}
         ${g.grp==='Números'?`<div class="frow" style="margin:8px 0 0"><label>Máx. dígitos del sufijo numérico</label><input id="wl-numlen" class="inp" type="number" value="4" min="1" max="6" data-p></div>`:''}
       </div>`).join('')}
-      <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn btn-gh btn-sm" onclick="doEstWL()">Estimar</button><button class="btn btn-gh btn-sm" onclick="doPrevWL()">Preview</button><button class="btn btn-g btn-sm" style="flex:1" id="wl-gen-btn" onclick="doGenWL()">${ic('zap')} Generar</button></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn btn-gh btn-sm" onclick="doEstWL()">Estimar</button><button class="btn btn-gh btn-sm" onclick="doPrevWL()">Preview</button><button class="btn btn-g btn-sm" id="wl-gen-btn" style="margin-left:auto" onclick="doGenWL()">${ic('zap')} Generar</button></div>
       <div id="wl-est" style="margin-top:9px"></div>
     </div>
     <div class="card"><div class="ctitle">${ic('eye')} Vista previa / Resultado</div><div id="wl-prev" class="empty" style="padding:24px">${ic('zap',36)}<h3>Sin vista previa</h3><p>Pulsa Vista previa o Generar</p></div></div>
   </div>
-  <div class="tc" id="wl-tc-1"><div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px"><div class="ctitle" style="margin-bottom:0">${ic('download')} Wordlists Disponibles</div><button class="btn btn-gh btn-sm" onclick="wordlists()">${ic('refresh',12)} Actualizar</button></div><div style="font-size:.76rem;color:var(--t2);margin-bottom:12px">${wls.total||0} archivos · ${wls.total_size_human||'—'} · <span class="mono">${wls.directory||'—'}</span></div>
-  ${!wlArr.length?`<div class="empty" style="padding:28px">${ic('download',36)}<h3>Sin wordlists</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Líneas</th><th>Tamaño</th><th>Muestra</th><th>Modificado</th><th></th></tr></thead><tbody>${wlArr.map(w=>`<tr><td class="mono">${w.filename}</td><td class="mono"><strong>${(w.lines||0).toLocaleString()}</strong></td><td class="mono">${w.size_human||fb(w.size_bytes)}</td><td style="font-size:.68rem;color:var(--t2);font-family:'JetBrains Mono',monospace">${(w.sample_first||[]).slice(0,4).join(', ')}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(w.modified_at)}</td><td><div style="display:flex;gap:4px"><a class="btn btn-gh btn-xs" href="${API}/wordlists/${w.filename}/download" target="_blank">${ic('download',11)}</a><button class="btn btn-d btn-xs btn-ico" onclick="doDelWL('${w.filename}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div></div>
+  <div class="tc" id="wl-tc-1"><div class="card" style="margin-bottom:14px"><div class="ctitle">${ic('download')} Importar diccionarios comunes</div><div class="hint">${ic('info',11)}Copia listas famosas del sistema (SecLists/rockyou) a tu carpeta de wordlists para usarlas directamente al crackear.</div><div id="wl-common-lists" style="display:flex;flex-direction:column;gap:8px"><div style="color:var(--t2);font-size:.78rem"><div class="spin" style="display:inline-block"></div> Cargando…</div></div></div><div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px"><div class="ctitle" style="margin-bottom:0">${ic('download')} Wordlists Disponibles</div><button class="btn btn-gh btn-sm" onclick="wordlists()">${ic('refresh',12)} Actualizar</button></div><div style="font-size:.76rem;color:var(--t2);margin-bottom:12px">${wls.total||0} archivos · ${wls.total_size_human||'—'} · <span class="mono">${wls.directory||'—'}</span></div>
+  ${!wlArr.length?`<div class="empty" style="padding:28px">${ic('download',36)}<h3>Sin wordlists</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Líneas</th><th>Tamaño</th><th>Muestra</th><th>Modificado</th><th></th></tr></thead><tbody>${wlArr.map(w=>`<tr><td class="mono">${w.filename}</td><td class="mono"><strong>${(w.lines||0).toLocaleString()}</strong></td><td class="mono">${w.size_human||fb(w.size_bytes)}</td><td style="font-size:.68rem;color:var(--t2);font-family:'JetBrains Mono',monospace">${(w.sample_first||[]).slice(0,4).join(', ')}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(w.modified_at)}</td><td><div style="display:flex;gap:4px"><a class="btn btn-gh btn-xs" href="${withTok(`${API}/wordlists/${w.filename}/download`)}" target="_blank">${ic('download',11)}</a><button class="btn btn-d btn-xs btn-ico" onclick="doDelWL('${w.filename}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div></div>
   </div>`);
   restFP('wl-form');renderSeeds();
   // sincroniza el resaltado visual de las mutaciones con el estado restaurado
-  document.querySelectorAll('#wl-form .mitem').forEach(m=>{const cb=m.querySelector('input[type=checkbox]');if(cb)m.classList.toggle('on',cb.checked);});}
+  document.querySelectorAll('#wl-form .mitem').forEach(m=>{const cb=m.querySelector('input[type=checkbox]');if(cb)m.classList.toggle('on',cb.checked);});
+  loadCommonLists();}
+async function loadCommonLists(){
+  const el=document.getElementById('wl-common-lists');if(!el)return;
+  try{
+    const lists=await A.wlCommonLists();
+    if(!lists||!lists.length){el.innerHTML='<span style="color:var(--t3);font-size:.76rem">Ninguno disponible en el sistema</span>';return;}
+    el.innerHTML=lists.map(l=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--bg0);border:1px solid var(--b0);border-radius:8px">
+      <div style="flex:1;min-width:0"><div class="mono" style="font-size:.78rem;color:var(--t0)">${l.name}</div><div style="font-size:.66rem;color:var(--t2)">${l.size_bytes?fb(l.size_bytes):'—'}${l.imported?' · <span style="color:var(--g)">ya importado</span>':''}</div></div>
+      ${l.available?`<button class="btn ${l.imported?'btn-gh':'btn-p'} btn-sm" onclick="wlImportBtn('${l.key}',this)">${l.imported?ic('refresh',12)+' Recopiar':ic('download',12)+' Importar'}</button>`:`<span class="badge b-x" style="font-size:.6rem">no en el sistema</span>`}
+    </div>`).join('');
+  }catch(e){el.innerHTML='<span style="color:var(--t3);font-size:.76rem">No disponible</span>';}
+}
+async function wlImportBtn(key,btn){
+  const t=btn?btn.innerHTML:null;if(btn){btn.disabled=true;btn.innerHTML='<div class="spin"></div> Copiando…';}
+  try{const r=await A.wlImportCommon(key);toast('Importado: '+r.filename+' ('+fb(r.size_bytes)+')','success');loadCommonLists();}
+  catch(e){toast(e.message,'error');}
+  if(btn){btn.disabled=false;btn.innerHTML=t;}
+}
 function togM(el,id){const cb=document.getElementById(id);if(cb){cb.checked=!cb.checked;el.classList.toggle('on',cb.checked);persistInput(cb);}}
 function renderSeeds(){const box=document.getElementById('sbox');if(!box)return;const inp=document.getElementById('sinput');box.querySelectorAll('.stag').forEach(e=>e.remove());_seeds.forEach(s=>{const t=document.createElement('span');t.className='stag';t.innerHTML=`${s}<span class="stag-x" onclick="rmSeed('${s}')">×</span>`;box.insertBefore(t,inp);});if(inp)inp.placeholder=_seeds.length?'Añadir más...':'Escribe y pulsa Enter o usa comas...';}
 function addSeed(w){w=w.trim();if(!w||_seeds.includes(w))return;_seeds.push(w);localStorage.setItem('wl-seeds',JSON.stringify(_seeds));renderSeeds();}
@@ -159,8 +180,8 @@ function rmSeed(w){_seeds=_seeds.filter(s=>s!==w);localStorage.setItem('wl-seeds
 function hSK(e){if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.replace(/,/g,'').trim();if(v)addSeed(v);e.target.value='';}else if(e.key==='Backspace'&&!e.target.value.length&&_seeds.length){rmSeed(_seeds[_seeds.length-1]);}}
 function hSI(e){if(e.target.value.includes(',')){const p=e.target.value.split(',');p.slice(0,-1).forEach(s=>{if(s.trim())addSeed(s);});e.target.value=p[p.length-1];}}
 function addPaste(){const inp=document.getElementById('spaste');if(!inp?.value)return;inp.value.split(',').map(s=>s.trim()).filter(Boolean).forEach(addSeed);inp.value='';toast('Palabras añadidas','success');}
-const WL_BOOL_IDS=['use_lowercase','use_uppercase','use_capitalize','use_alternating_case','use_leet','use_number_infix','use_doubling','use_stretching','use_reverse','use_palindrome','use_numbers','use_years','use_birth_years','use_symbols','use_double_symbols','use_symbol_pairs','combine_words','combine_3_words','use_separators','use_reverse_combine','add_common_base','add_spanish_base','add_spanish_names'];
-function getWLC(){const M={};WL_BOOL_IDS.forEach(k=>{const e=document.getElementById(k);M[k]=e?e.checked:false;});return{seed_words:_seeds,output_filename:document.getElementById('wl-name')?.value||'custom.txt',min_length:parseInt(document.getElementById('wl-min')?.value)||6,max_length:parseInt(document.getElementById('wl-max')?.value)||32,leet_intensity:document.getElementById('wl-leet')?.value||'medium',number_max_length:parseInt(document.getElementById('wl-numlen')?.value)||4,max_total:parseInt(document.getElementById('wl-maxtotal')?.value)||10000000,...M};}
+const WL_BOOL_IDS=['use_lowercase','use_uppercase','use_capitalize','use_alternating_case','use_leet','use_number_infix','use_doubling','use_stretching','use_reverse','use_palindrome','use_strip_accents','use_numbers','use_years','use_birth_years','use_wide_years','use_symbols','use_double_symbols','use_symbol_pairs','combine_words','combine_3_words','use_separators','use_reverse_combine','add_common_base','add_spanish_base','add_spanish_names','add_common_passwords'];
+function getWLC(){const M={};WL_BOOL_IDS.forEach(k=>{const e=document.getElementById(k);M[k]=e?e.checked:false;});return{seed_words:_seeds,output_filename:document.getElementById('wl-name')?.value||'custom.txt',min_length:parseInt(document.getElementById('wl-min')?.value)||6,max_length:parseInt(document.getElementById('wl-max')?.value)||32,leet_intensity:document.getElementById('wl-leet')?.value||'medium',number_max_length:parseInt(document.getElementById('wl-numlen')?.value)||4,max_total:parseInt(document.getElementById('wl-maxtotal')?.value)||10000000,common_passwords_count:parseInt(document.getElementById('wl-cpwcount')?.value)||10000,...M};}
 function wlPreset(id){const p=WLPRESETS.find(x=>x.id===id);if(!p)return;document.querySelectorAll('.wl-preset').forEach(e=>e.classList.remove('on'));document.getElementById('wlp-'+id)?.classList.add('on');Object.entries(p.cfg).forEach(([k,v])=>{const e=document.getElementById(k);if(e){e.checked=v;e.closest('.mitem')?.classList.toggle('on',v);}});const leet=document.getElementById('wl-leet');if(leet&&p.leet)leet.value=p.leet;document.getElementById('wl-preset')&&(document.getElementById('wl-preset').value='');toast(`Preset "${p.l}" aplicado`,'success');if(_seeds.length)doEstWL();}
 async function doEstWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const el=document.getElementById('wl-est');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--t2);font-size:.76rem"><div class="spin"></div> Estimando...</div>`;try{const r=await A.estimateWL(getWLC());if(el)el.innerHTML=`<div style="font-size:.78rem;color:var(--t1);display:flex;gap:12px;flex-wrap:wrap"><div>Total: <strong style="color:var(--g)">${r.estimated_count_human}</strong></div><div>Tamaño: <strong>${r.estimated_size_human}</strong></div><div>Tiempo: <strong>~${r.estimated_time_seconds}s</strong></div></div>`;}catch(e){toast(e.message,'error');if(el)el.innerHTML='';}}
 async function doPrevWL(){
@@ -177,7 +198,7 @@ async function doPrevWL(){
       <div style="display:flex;flex-direction:column;gap:13px">${cats.map(([cat,s])=>`
         <div>
           <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><span style="font-size:.63rem;color:var(--c);text-transform:uppercase;letter-spacing:.12em;font-weight:700;white-space:nowrap">${cat}</span><span style="flex:1;height:1px;background:var(--b0)"></span><span class="badge b-x" style="font-size:.56rem">${s.length}</span></div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">${spread(s,8).map(w=>`<span class="kbd">${(''+w).replace(/</g,'&lt;')}</span>`).join('')}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">${spread(s,12).map(w=>`<span class="kbd">${(''+w).replace(/</g,'&lt;')}</span>`).join('')}</div>
         </div>`).join('')}</div>`;
   }catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}
 }
@@ -189,8 +210,8 @@ function fmtUptime(s){if(s==null)return '—';s=Math.floor(s);const d=Math.floor
 function meterBar(pct){pct=Math.max(0,Math.min(100,pct||0));const col=pct<60?'var(--g)':pct<85?'var(--y)':'var(--r)';return `<div class="ptrack" style="height:6px"><div style="height:100%;border-radius:2px;width:${pct}%;background:${col};transition:width .5s"></div></div>`;}
 async function system(){
   setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
-  let pf=null,info=null,procs=[];
-  try{[pf,info,procs]=await Promise.all([A.preflight().catch(()=>null),A.info().catch(()=>null),A.procs().catch(()=>[])]);}catch{}
+  let pf=null,info=null,procs=[],authSt=null;
+  try{[pf,info,procs,authSt]=await Promise.all([A.preflight().catch(()=>null),A.info().catch(()=>null),A.procs().catch(()=>[]),A.authStatus().catch(()=>null)]);}catch{}
   const sys=info||pf?.system||{},tools=pf?.tools||{},byC={};
   Object.entries(tools).forEach(([n,t])=>{const c=t.category||'other';if(!byC[c])byC[c]=[];byC[c].push([n,t]);});
   const run=procs.filter(p=>p.status==='running').length;
@@ -201,11 +222,11 @@ async function system(){
       <div class="tab" onclick="swTab('sys-tabs','sys-tc',1)">${ic('refresh',13)} Procesos${run?` <span class="badge b-y" style="margin-left:4px">${run}</span>`:''}</div>
       <div class="tab" onclick="swTab('sys-tabs','sys-tc',2)">${ic('zap',13)} Herramientas <span class="badge ${okCount===toolCount?'b-g':'b-x'}" style="margin-left:4px">${okCount}/${toolCount}</span></div>
     </div>
-    <div class="tc active" id="sys-tc-0">${sysInfoHTML(sys,pf)}</div>
+    <div class="tc active" id="sys-tc-0">${sysInfoHTML(sys,pf,authSt)}</div>
     <div class="tc" id="sys-tc-1"><div id="sys-procs">${sysProcsHTML(procs)}</div></div>
     <div class="tc" id="sys-tc-2">${sysToolsHTML(byC)}</div>
   </div>`);loadDataUsage();}
-function sysInfoHTML(sys,pf){
+function sysInfoHTML(sys,pf,auth){
   const rows=[['Hostname',sys.hostname,'var(--c)'],['Distribución',sys.distro,null],['Kernel',sys.kernel||sys.release,null],['Arquitectura',sys.arch,null],['Usuario',sys.user,null],['Python',sys.python||sys.python_version,null],['Uptime',fmtUptime(sys.uptime_seconds),null]];
   return `<div class="g2" style="margin-bottom:14px;align-items:start">
     <div class="card">
@@ -239,6 +260,16 @@ function sysInfoHTML(sys,pf){
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px"><div class="ctitle" style="margin-bottom:0">${ic('folder')} Datos del backend</div><button class="btn btn-gh btn-xs" onclick="loadDataUsage()" title="Recargar uso de disco">${ic('refresh',12)}</button></div>
         <div id="sys-data-usage" style="font-size:.76rem;color:var(--t2)">Cargando uso de disco…</div>
         <button class="btn btn-d btn-sm" style="width:100%;margin-top:11px" onclick="wipeAllData()">${ic('trash',12)} Eliminar TODOS los datos</button>
+      </div>
+      <div class="card">
+        <div class="ctitle">${ic('shield')} Seguridad / Acceso</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">
+          ${auth&&auth.require_auth?`<span class="badge b-g">🔒 Token requerido</span>`:`<span class="badge b-x">Sin token</span>`}
+          ${(location.hostname==='localhost'||location.hostname==='127.0.0.1')?`<span class="badge b-c">Solo localhost</span>`:`<span class="badge b-y">Accesible en LAN</span>`}
+          ${AUTH_TOKEN?`<span class="badge b-g">Sesión activa</span>`:''}
+        </div>
+        <div class="hint" style="margin-bottom:${AUTH_TOKEN?'9px':'0'}">${ic('info',11)}${auth&&auth.require_auth?'El backend exige token de acceso. Para exponerlo protegido en la red local: <b>sudo WFAUDIT_TOKEN=secreto ./wfaudit start</b>.':'El backend solo escucha en localhost (seguro por defecto). Arráncalo con <b>WFAUDIT_TOKEN</b> para exponerlo en la LAN protegido con token.'}</div>
+        ${AUTH_TOKEN?`<div style="display:flex;gap:7px"><button class="btn btn-gh btn-sm" style="flex:1" onclick="promptToken(false)">${ic('key',12)} Cambiar token</button><button class="btn btn-d btn-sm" style="flex:1" onclick="clearToken()">Cerrar sesión</button></div>`:''}
       </div>
     </div>
   </div>`;}

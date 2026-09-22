@@ -414,6 +414,7 @@ class WordlistGenerateRequest(BaseModel):
     use_stretching: bool = False
     use_reverse: bool = True
     use_palindrome: bool = False
+    use_strip_accents: bool = True
 
     # NEW: Number infix
     use_number_infix: bool = True
@@ -423,6 +424,7 @@ class WordlistGenerateRequest(BaseModel):
     number_max_length: int = 4
     use_years: bool = True
     use_birth_years: bool = True
+    use_wide_years: bool = False
 
     # Symbols
     use_symbols: bool = True
@@ -439,6 +441,8 @@ class WordlistGenerateRequest(BaseModel):
     add_common_base: bool = True
     add_spanish_base: bool = True
     add_spanish_names: bool = True
+    add_common_passwords: bool = False
+    common_passwords_count: int = 10000
 
     # Length filter
     min_length: int = 6

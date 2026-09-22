@@ -33,6 +33,13 @@ def _dir_size(path) -> int:
 async def health():
     return {"status": "ok"}
 
+
+@router.get("/auth-status")
+async def auth_status():
+    """Indica si el backend exige token de acceso (endpoint sin autenticación,
+    para que el frontend sepa si debe pedir el token antes de tenerlo)."""
+    return {"require_auth": settings.REQUIRE_AUTH}
+
 @router.get("/info")
 async def system_info():
     return await get_system_info()

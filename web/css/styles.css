@@ -247,7 +247,7 @@ tr.ws-ap.ws-mark:hover>td{background:rgba(88,166,255,.17);}
 .stag-x{cursor:pointer;opacity:.7;font-size:.9rem;}.stag-x:hover{opacity:1;}
 #sinput{border:none;outline:none;background:transparent;color:var(--t0);font-family:'JetBrains Mono',monospace;font-size:.78rem;min-width:120px;flex:1;padding:2px 4px;}
 /* MUTATIONS */
-.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px;}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:7px;margin-bottom:14px;}
 .mitem{background:var(--bg3);border:1px solid var(--b0);border-radius:var(--r);padding:9px 11px;cursor:pointer;transition:all var(--t);}
 .mitem:hover{border-color:var(--b1);}.mitem.on{border-color:var(--c);background:var(--c3);}
 .mlabel{font-size:.79rem;font-weight:600;color:var(--t0);margin-bottom:2px;display:flex;align-items:center;gap:6px;}

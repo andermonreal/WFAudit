@@ -1,5 +1,6 @@
 """API routes for wordlist generation and management."""
 import os
+import shutil
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from app.models.schemas import WordlistGenerateRequest
@@ -7,6 +8,28 @@ from app.services.wordlist_service import wordlist_service
 from app.config import settings
 
 router = APIRouter(prefix="/wordlists", tags=["Wordlists"])
+
+# Diccionarios comunes del sistema (SecLists / rockyou) importables como wordlists.
+# Cada clave mapea a varias rutas candidatas (SecLists/seclists según distro).
+COMMON_LISTS = {
+    "xato-100k": (["/usr/share/SecLists/Passwords/Common-Credentials/xato-net-10-million-passwords-100000.txt",
+                   "/usr/share/seclists/Passwords/Common-Credentials/xato-net-10-million-passwords-100000.txt"],
+                  "xato-top-100000.txt"),
+    "xato-10m": (["/usr/share/SecLists/Passwords/Common-Credentials/xato-net-10-million-passwords.txt",
+                  "/usr/share/seclists/Passwords/Common-Credentials/xato-net-10-million-passwords.txt"],
+                 "xato-10-million.txt"),
+    "rockyou": (["/usr/share/wordlists/rockyou.txt",
+                 "/usr/share/SecLists/Passwords/Leaked-Databases/rockyou.txt",
+                 "/usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt"],
+                "rockyou.txt"),
+    "10k": (["/usr/share/SecLists/Passwords/Common-Credentials/10k-most-common.txt",
+             "/usr/share/seclists/Passwords/Common-Credentials/10k-most-common.txt"],
+            "10k-most-common.txt"),
+}
+
+
+def _resolve_src(candidates):
+    return next((p for p in candidates if os.path.isfile(p)), None)
 
 
 @router.get("")
@@ -38,7 +61,7 @@ async def estimate_wordlist(req: WordlistGenerateRequest):
     Useful for previewing before launching a long generation.
     """
     params = req.model_dump()
-    return wordlist_service.estimate(params)
+    return await wordlist_service.estimate(params)
 
 
 @router.post("/preview")
@@ -49,6 +72,38 @@ async def preview_mutations(req: WordlistGenerateRequest):
     """
     params = req.model_dump()
     return await wordlist_service.preview(params)
+
+
+@router.get("/common-lists")
+async def available_common_lists():
+    """Diccionarios comunes del sistema (SecLists/rockyou) disponibles para importar."""
+    out = []
+    for key, (cands, dst) in COMMON_LISTS.items():
+        src = _resolve_src(cands)
+        out.append({
+            "key": key, "name": dst, "source": src or cands[0], "available": src is not None,
+            "size_bytes": os.path.getsize(src) if src else 0,
+            "imported": (settings.WORDLISTS_DIR / dst).exists(),
+        })
+    return out
+
+
+@router.post("/import-common/{key}")
+async def import_common_list(key: str):
+    """Copia un diccionario común de SecLists a la carpeta de wordlists (para crackear)."""
+    if key not in COMMON_LISTS:
+        raise HTTPException(400, "Lista desconocida")
+    cands, dst = COMMON_LISTS[key]
+    src = _resolve_src(cands)
+    if not src:
+        raise HTTPException(404, "No está en el sistema (instala seclists o wordlists)")
+    settings.WORDLISTS_DIR.mkdir(parents=True, exist_ok=True)
+    dest = settings.WORDLISTS_DIR / dst
+    try:
+        shutil.copy2(src, dest)
+    except Exception as e:
+        raise HTTPException(500, f"No se pudo copiar: {e}")
+    return {"imported": True, "filename": dst, "size_bytes": dest.stat().st_size}
 
 
 @router.get("/{filename}/info")

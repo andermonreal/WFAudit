@@ -40,9 +40,25 @@ VENV_DIR="${SCRIPT_DIR}/.venv"
 LOG_DIR="${SCRIPT_DIR}/logs"
 PID_DIR="${SCRIPT_DIR}/.pids"
 
-BACKEND_HOST="${WFAUDIT_HOST:-0.0.0.0}"
+# ─── Red y autenticación ───
+# Seguro por defecto: sin token → solo localhost (127.0.0.1). Si se define
+# WFAUDIT_TOKEN, se asume exposición en LAN (0.0.0.0) y el backend exige ese
+# token (cabecera Authorization: Bearer / X-API-Key / ?token=). WFAUDIT_HOST
+# permite forzar el bind manualmente en cualquier caso.
+BACKEND_TOKEN="${WFAUDIT_TOKEN:-}"
+if [ -n "$BACKEND_TOKEN" ]; then
+    _DEFAULT_HOST="0.0.0.0"
+else
+    _DEFAULT_HOST="127.0.0.1"
+fi
+BACKEND_HOST="${WFAUDIT_HOST:-$_DEFAULT_HOST}"
+FRONTEND_HOST="${WFAUDIT_FRONTEND_HOST:-$BACKEND_HOST}"
 BACKEND_PORT="${WFAUDIT_PORT:-8000}"
 FRONTEND_PORT="${WFAUDIT_FRONTEND_PORT:-8080}"
+
+# Cabecera de auth para las sondas curl internas (status), vacía si no hay token.
+CURL_AUTH=()
+[ -n "$BACKEND_TOKEN" ] && CURL_AUTH=(-H "X-API-Key: ${BACKEND_TOKEN}")
 
 BACKEND_LOG="${LOG_DIR}/backend.log"
 FRONTEND_LOG="${LOG_DIR}/frontend.log"
@@ -230,6 +246,8 @@ cmd_install() {
         build-essential libssl-dev libffi-dev
         # Opcionales pero recomendadas
         freeradius reaver bully crunch
+        # Diccionarios / OSINT (para importar y crackear)
+        seclists wordlists
     )
 
     case "$DISTRO" in
@@ -260,6 +278,22 @@ cmd_install() {
             ;;
     esac
     ok "Dependencias del sistema procesadas"
+
+    # Base de datos OUI (fabricantes) para lookups precisos de MAC
+    local OUI_DEST="${BACKEND_DIR}/data/oui.txt"
+    if [ -s "$OUI_DEST" ]; then
+        ok "Base de datos OUI ya presente"
+    else
+        info "Descargando base de datos OUI del IEEE..."
+        mkdir -p "${BACKEND_DIR}/data"
+        if curl -fsSL -o "$OUI_DEST" "https://standards-oui.ieee.org/oui/oui.txt" 2>/dev/null \
+           || wget -q -O "$OUI_DEST" "http://standards-oui.ieee.org/oui/oui.txt" 2>/dev/null; then
+            ok "Base de datos OUI descargada ($(du -h "$OUI_DEST" 2>/dev/null | cut -f1 || echo '?'))"
+        else
+            rm -f "$OUI_DEST"
+            warn "No se pudo descargar la base OUI (¿sin internet?). Puedes hacerlo luego desde el panel Sistema."
+        fi
+    fi
 
     ensure_iwconfig || true
 
@@ -343,6 +377,15 @@ cmd_start() {
     [ -x "$VENV_DIR/bin/uvicorn" ] || die "Virtual environment no encontrado. Ejecuta './wfaudit install' primero."
 
     # ─── Backend ───
+    # Si hay token, se lo pasamos al backend por entorno (pydantic Settings lee
+    # API_KEY / REQUIRE_AUTH). El proceso hereda estas variables (corre como root
+    # sin sudo, ver launch()).
+    if [ -n "$BACKEND_TOKEN" ]; then
+        export REQUIRE_AUTH="true"
+        export API_KEY="$BACKEND_TOKEN"
+        info "Autenticación por token ACTIVADA (exposición en LAN protegida)"
+    fi
+
     step "Arrancando Backend (FastAPI)"
     launch "$BACKEND_PID" "$BACKEND_LOG" "$BACKEND_DIR" root \
         "$VENV_DIR/bin/uvicorn" app.main:app --host "$BACKEND_HOST" --port "$BACKEND_PORT"
@@ -370,7 +413,7 @@ cmd_start() {
     if [ -f "$FRONTEND_DIR/index.html" ]; then
         step "Arrancando interfaz web"
         launch "$FRONTEND_PID" "$FRONTEND_LOG" "$FRONTEND_DIR" "$INVOKER" \
-            python3 -m http.server "$FRONTEND_PORT" --bind 0.0.0.0
+            python3 -m http.server "$FRONTEND_PORT" --bind "$FRONTEND_HOST"
         sleep 1
         is_running "$FRONTEND_PID" && ok "Interfaz web arriba (PID $(cat "$FRONTEND_PID"))" \
                                    || warn "No se pudo servir la interfaz web (revisa $FRONTEND_LOG)"
@@ -384,6 +427,21 @@ cmd_start() {
     echo "  Backend / API .... http://localhost:${BACKEND_PORT}        (docs Swagger en /docs)"
     is_running "$FRONTEND_PID" && \
     echo "  Interfaz web ..... http://localhost:${FRONTEND_PORT}/"
+    if [ "$BACKEND_HOST" = "0.0.0.0" ]; then
+        local lan_ip; lan_ip="$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1)"
+        echo
+        echo "  ⚠ Accesible desde la RED LOCAL (bind 0.0.0.0)"
+        [ -n "$lan_ip" ] && echo "    En la LAN:     http://${lan_ip}:${FRONTEND_PORT}/"
+        if [ -n "$BACKEND_TOKEN" ]; then
+            echo "    Protegido con token (WFAUDIT_TOKEN) — se pedirá al abrir la interfaz."
+        else
+            echo "    SIN token — cualquiera en la red puede usar la API. Define WFAUDIT_TOKEN para protegerla."
+        fi
+    else
+        echo
+        echo "  Solo accesible desde localhost (seguro por defecto)."
+        echo "  Para exponerlo en la LAN protegido:  sudo WFAUDIT_TOKEN=tu-secreto ./wfaudit start"
+    fi
     echo
     echo "  Logs:  ./wfaudit logs        Estado: ./wfaudit status"
     echo "  Parar: sudo ./wfaudit stop"
@@ -451,8 +509,8 @@ cmd_status() {
             echo "  Health ..... ✗ NO RESPONDE"
         fi
         local mitm et
-        mitm="$(curl -sf "http://localhost:${BACKEND_PORT}/attacks/mitm/status" 2>/dev/null || echo '')"
-        et="$(curl -sf "http://localhost:${BACKEND_PORT}/attacks/evil-twin/status" 2>/dev/null || echo '')"
+        mitm="$(curl -sf "${CURL_AUTH[@]}" "http://localhost:${BACKEND_PORT}/attacks/mitm/status" 2>/dev/null || echo '')"
+        et="$(curl -sf "${CURL_AUTH[@]}" "http://localhost:${BACKEND_PORT}/attacks/evil-twin/status" 2>/dev/null || echo '')"
         echo "$mitm" | grep -q '"active":true' && echo "  MITM ....... ● ACTIVO"
         echo "$et"   | grep -q '"active":true' && echo "  Evil Twin .. ● ACTIVO"
     fi
@@ -546,8 +604,11 @@ COMANDOS
     help       Esta ayuda
 
 VARIABLES DE ENTORNO
-    WFAUDIT_HOST           Host del backend        (default: 0.0.0.0)
-    WFAUDIT_PORT           Puerto del backend      (default: 8000)
+    WFAUDIT_TOKEN          Token de acceso. Si se define, expone en LAN (0.0.0.0)
+                           y exige el token en cada petición. Sin él: solo localhost.
+    WFAUDIT_HOST           Fuerza el host del backend  (default: 127.0.0.1, o 0.0.0.0 con token)
+    WFAUDIT_FRONTEND_HOST  Fuerza el host de la interfaz web (default: igual que el backend)
+    WFAUDIT_PORT           Puerto del backend        (default: 8000)
     WFAUDIT_FRONTEND_PORT  Puerto de la interfaz web (default: 8080)
 
 PRIMER USO
