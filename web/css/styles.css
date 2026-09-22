@@ -165,6 +165,10 @@ tr:last-child td{border-bottom:none;}tbody tr{transition:background var(--t);}tb
 /* MISC */
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 20px;color:var(--t2);gap:10px;text-align:center;}
 .empty svg{opacity:.35;}.empty h3{font-size:.88rem;font-weight:600;color:var(--t1);}.empty p{font-size:.76rem;}
+/* AP marcado en Escaneo WiFi: tono sutil + barra lateral para localizarlo fácil */
+tr.ws-ap.ws-mark>td{background:rgba(88,166,255,.11);}
+tr.ws-ap.ws-mark>td:first-child{box-shadow:inset 3px 0 0 var(--c);}
+tr.ws-ap.ws-mark:hover>td{background:rgba(88,166,255,.17);}
 .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--b0);border-top-color:var(--c);border-radius:50%;animation:sp .7s linear infinite;}
 @keyframes sp{to{transform:rotate(360deg);}}
 .kbd{display:inline-block;padding:1px 5px;background:var(--bg3);border:1px solid var(--b1);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--t1);}
@@ -264,8 +268,8 @@ tr:last-child td{border-bottom:none;}tbody tr{transition:background var(--t);}tb
 #tipbox.show{opacity:1;}
 label .tip,.ctitle .tip{margin-left:5px;}
 /* INLINE HINT (helper text under fields/titles) */
-.hint{font-size:.68rem;color:var(--t2);line-height:1.5;margin:-2px 0 3px;font-family:'Outfit',sans-serif;display:flex;gap:5px;align-items:flex-start;}
-.hint svg{width:11px;height:11px;flex-shrink:0;margin-top:2px;opacity:.7;}
+.hint{font-size:.68rem;color:var(--t2);line-height:1.55;margin:-2px 0 7px;font-family:'Outfit',sans-serif;}
+.hint svg{width:11px;height:11px;opacity:.7;vertical-align:-1px;margin-right:4px;}
 .hint.warn{color:var(--o);}.hint.warn svg{opacity:.9;}
 /* HELP PANEL */
 .help-intro{padding:14px 18px;background:var(--c3);border:1px solid var(--c);border-radius:var(--rl);font-size:.8rem;color:var(--t1);line-height:1.7;margin-bottom:14px;}

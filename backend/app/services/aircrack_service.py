@@ -23,6 +23,8 @@ class AircrackService:
     def __init__(self):
         self._scans: dict[str, WifiScanResult] = {}
         self._active_processes: dict[str, str] = {}
+        self._scan_prefix: dict[str, str] = {}
+        self._bg: set = set()
 
     async def scan_networks(self, req: WifiScanRequest) -> WifiScanResult:
         """Run airodump-ng scan with band/channel/ESSID filtering."""
@@ -54,27 +56,53 @@ class AircrackService:
             started_at=datetime.now(),
         )
         self._scans[scan_id] = scan
+        self._scan_prefix[scan_id] = output_prefix
 
-        managed = await process_manager.run(cmd, timeout=req.duration)
-        self._active_processes[scan_id] = managed.id
+        # Se lanza en SEGUNDO PLANO y se devuelve ya con estado RUNNING: el
+        # frontend sondea /wifi/scans/{id} y ve resultados parciales en vivo
+        # (airodump escribe el CSV cada 3s) → progreso real durante el escaneo.
+        t = asyncio.create_task(self._run_scan(scan_id, cmd, output_prefix, req.duration))
+        self._bg.add(t)
+        t.add_done_callback(self._bg.discard)
+        return scan
 
-        csv_files = glob.glob(f"{output_prefix}*.csv")
-        if csv_files:
-            # Use first non-kismet CSV
-            main_csv = [f for f in csv_files if "kismet" not in f]
+    async def _run_scan(self, scan_id: str, cmd: list, output_prefix: str, duration: int):
+        scan = self._scans.get(scan_id)
+        # Registrar el proc_id ANTES de arrancar para que "Detener" pueda matarlo
+        # mientras corre (antes se asignaba al terminar y el stop no encontraba nada).
+        proc_id = str(uuid.uuid4())[:8]
+        self._active_processes[scan_id] = proc_id
+        try:
+            managed = await process_manager.run(cmd, timeout=duration, proc_id=proc_id)
+        except Exception as e:
+            logger.error(f"[{scan_id}] scan failed: {e}")
+            if scan:
+                scan.status = ScanStatus.FAILED
+                scan.finished_at = datetime.now()
+            return
+        if not scan:
+            return
+        self._parse_scan_csv(scan, output_prefix, final=True)
+        scan.finished_at = datetime.now()
+
+    def _parse_scan_csv(self, scan: WifiScanResult, output_prefix: str, final: bool = False):
+        """Parsea el CSV de airodump (parcial o final) sobre el objeto scan."""
+        try:
+            main_csv = [f for f in glob.glob(f"{output_prefix}*.csv") if "kismet" not in f]
             if main_csv:
                 aps, clients = parse_airodump_csv(main_csv[0])
                 scan.access_points = aps
                 scan.clients = clients
                 scan.client_count = len(clients)
-                scan.status = ScanStatus.COMPLETED
-            else:
+                if final:
+                    scan.status = ScanStatus.COMPLETED
+                    scan.capture_files = glob.glob(f"{output_prefix}*")
+            elif final:
                 scan.status = ScanStatus.FAILED
-        else:
-            scan.status = ScanStatus.FAILED
-
-        scan.capture_files = glob.glob(f"{output_prefix}*")
-        scan.finished_at = datetime.now()
+        except Exception as e:
+            logger.warning(f"parse airodump csv: {e}")
+            if final:
+                scan.status = ScanStatus.FAILED
         return scan
 
     async def get_pnl_report(self, scan_id: str) -> Optional[dict]:
@@ -191,7 +219,12 @@ class AircrackService:
         }
 
     def get_scan(self, scan_id: str) -> Optional[WifiScanResult]:
-        return self._scans.get(scan_id)
+        scan = self._scans.get(scan_id)
+        if scan and scan.status == ScanStatus.RUNNING:
+            prefix = self._scan_prefix.get(scan_id)
+            if prefix:
+                self._parse_scan_csv(scan, prefix, final=False)   # resultados parciales en vivo
+        return scan
 
     def list_scans(self) -> list[WifiScanResult]:
         return list(self._scans.values())

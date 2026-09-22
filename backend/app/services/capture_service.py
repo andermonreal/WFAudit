@@ -34,6 +34,34 @@ VALID_EXTENSIONS = {
 
 
 class CaptureService:
+    def __init__(self):
+        # caché de análisis por (ruta, mtime, tamaño) para no re-verificar en cada listado
+        self._hs_cache: dict = {}
+
+    async def _analyze_capture(self, fp, primary_ext: str, mtime: float, size: int):
+        """Devuelve (has_handshake, has_pmkid) para un fichero de captura.
+
+        - Formatos hash (.22000/.16800/.hccapx): por extensión.
+        - Capturas (.cap/.pcap/.pcapng): con aircrack-ng, cacheado.
+        - El resto (.csv, .netxml, .log, .txt, .json…): no son crackeables → (False, False).
+        """
+        if primary_ext in (".22000", ".16800", ".hc22000"):
+            return (False, True)
+        if primary_ext == ".hccapx":
+            return (True, False)
+        if primary_ext in (".cap", ".pcap", ".pcapng"):
+            key = (str(fp), mtime, size)
+            if key in self._hs_cache:
+                return self._hs_cache[key]
+            try:
+                r = await self.check_handshake(str(fp))
+                res = (bool(r.get("has_handshake")), bool(r.get("has_pmkid")))
+            except Exception:
+                res = (False, False)
+            self._hs_cache[key] = res
+            return res
+        return (False, False)
+
     async def list_captures(
         self,
         directory: Optional[str] = None,
@@ -83,6 +111,7 @@ class CaptureService:
                     if match:
                         essid = match.group(1).replace("_", " ")
 
+                    hs, pk = await self._analyze_capture(fp, primary_ext, stat.st_mtime, stat.st_size)
                     files.append(CaptureFile(
                         filename=fname,
                         filepath=str(fp),
@@ -90,8 +119,8 @@ class CaptureService:
                         size_bytes=stat.st_size,
                         created_at=datetime.fromtimestamp(stat.st_ctime),
                         target_essid=essid,
-                        has_handshake=False,
-                        has_pmkid=False,
+                        has_handshake=hs,
+                        has_pmkid=pk,
                     ))
 
         # Newest first

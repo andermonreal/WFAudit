@@ -40,8 +40,9 @@ class ProcessManager:
         output_file: Optional[str] = None,
         on_stdout: Optional[Callable] = None,
         env: Optional[dict] = None,
+        proc_id: Optional[str] = None,
     ) -> ManagedProcess:
-        proc_id = str(uuid.uuid4())[:8]
+        proc_id = proc_id or str(uuid.uuid4())[:8]
         managed = ManagedProcess(
             id=proc_id,
             command=command,

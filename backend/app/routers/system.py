@@ -1,9 +1,33 @@
+import os
+import shutil
 from fastapi import APIRouter
+from app.config import settings
 from app.utils.tool_checker import check_tools, check_tools_by_category, check_root, get_system_info
 from app.utils.process_manager import process_manager
 from app.utils.oui_lookup import lookup_manufacturer, download_oui_db
 
 router = APIRouter(prefix="/system", tags=["System"])
+
+_DATA_DIRS = [
+    settings.DATA_DIR, settings.CAPTURES_DIR, settings.REPORTS_DIR,
+    settings.HANDSHAKES_DIR, settings.PMKID_DIR, settings.WORDLISTS_DIR,
+    settings.LOGS_DIR, settings.HOSTAPD_DIR, settings.ENTERPRISE_DIR,
+    settings.EVIDENCE_DIR, settings.RECON_DIR,
+]
+
+
+def _dir_size(path) -> int:
+    total = 0
+    try:
+        for root, _dirs, files in os.walk(path):
+            for f in files:
+                try:
+                    total += os.path.getsize(os.path.join(root, f))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return total
 
 @router.get("/health")
 async def health():
@@ -49,3 +73,74 @@ async def oui_lookup(mac: str):
 async def download_oui():
     """Download IEEE OUI database for manufacturer lookups."""
     return await download_oui_db()
+
+
+def _human(n: int) -> str:
+    for u in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024:
+            return f"{n:.0f} {u}" if u == "B" else f"{n:.1f} {u}"
+        n /= 1024
+    return f"{n:.1f} PB"
+
+
+@router.get("/data-usage")
+async def data_usage():
+    """Uso de disco de la carpeta de datos del backend, desglosado por subcarpeta."""
+    folders = []
+    total = 0
+    for d in _DATA_DIRS:
+        if d == settings.DATA_DIR:
+            continue
+        size = _dir_size(d)
+        cnt = 0
+        try:
+            cnt = sum(len(fs) for _r, _ds, fs in os.walk(d))
+        except OSError:
+            pass
+        total += size
+        folders.append({"name": d.name, "path": str(d), "bytes": size,
+                        "human": _human(size), "files": cnt})
+    folders.sort(key=lambda x: x["bytes"], reverse=True)
+    return {"data_dir": str(settings.DATA_DIR), "total_bytes": total,
+            "total_human": _human(total), "folders": folders}
+
+
+@router.post("/wipe-data")
+async def wipe_data():
+    """Borra TODO el contenido de la carpeta de datos del backend (capturas, informes,
+    wordlists, evidencias, recon, handshakes, logs…). Irreversible. Recrea las
+    carpetas vacías y resetea el estado en memoria (sesiones, mapa de recon, escaneos).
+    """
+    removed = []
+    if settings.DATA_DIR.exists():
+        for child in list(settings.DATA_DIR.iterdir()):
+            try:
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    child.unlink()
+                removed.append(child.name)
+            except Exception:
+                pass
+    for d in _DATA_DIRS:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+    # resetear estado en memoria para que no queden referencias a ficheros borrados
+    try:
+        from app.services.session_service import session_service
+        session_service._sessions.clear()
+    except Exception:
+        pass
+    try:
+        from app.services.recon_service import recon_service
+        recon_service.clear_map()
+    except Exception:
+        pass
+    try:
+        from app.services.aircrack_service import aircrack_service
+        aircrack_service._scans.clear()
+    except Exception:
+        pass
+    return {"wiped": True, "removed": removed}

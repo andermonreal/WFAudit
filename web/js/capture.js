@@ -7,20 +7,22 @@ async function sniffing(){
   setC(`<div class="sup"><div class="g2">
     <div class="card">
       <div class="ctitle">${ic('key')} Sniffing — Captura de Handshake</div>
-      <div class="hint">${ic('info',11)}Captura el handshake WPA/WPA2 de 4 vías escuchando la red. Con clientes conectados, el deauth acelera la captura forzando una reconexión. ¿Sin clientes? Prueba <b onclick="goto('advanced')" style="color:var(--c);cursor:pointer">PMKID</b> (panel Avanzado).</div>
+      <div class="hint">${ic('info',11)}Captura el handshake WPA/WPA2 de 4 vías escuchando la red. Con clientes conectados, el deauth acelera la captura forzando una reconexión.</div>
       <div class="fgrid"><div class="frow"><label>Interfaz</label><select id="hs-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name} (${i.mode})</option>`).join('')}</select></div><div class="frow"><label>Canal</label><input id="hs-ch" class="inp" type="number" value="6"></div></div>
       <div class="frow"><label>BSSID objetivo *</label><input id="hs-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div>
       <div class="frow"><label>ESSID (opcional)</label><input id="hs-essid" class="inp" placeholder="Nombre de la red"></div>
-      <div class="fgrid"><div class="frow"><label>Timeout (seg) <span class="tip" data-tip="Tiempo máximo esperando el handshake. Si el AP tiene clientes activos suele bastar 60-120s. Sin clientes, considera usar PMKID (panel Avanzado).">?</span></label><input id="hs-to" class="inp" type="number" value="120"></div><div class="frow"><label>Paquetes deauth <span class="tip" data-tip="Cuántas tramas de desautenticación enviar para forzar la reconexión del cliente. 5-10 suele bastar; más es más ruidoso y detectable.">?</span></label><input id="hs-dp" class="inp" type="number" value="10"></div></div>
-      <div class="crow"><input type="checkbox" id="hs-da" checked><label for="hs-da">Enviar deauth antes de capturar</label></div>
-      <div style="border:1px solid var(--b0);border-radius:8px;padding:12px;margin:12px 0;background:var(--bg3)">
-        <div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px">${ic('stop',11)} Deauth Manual (bajo demanda)</div>
-        <div class="alert aw" style="margin-bottom:9px">${ic('warn')}<div style="font-size:.74rem">Solo en redes propias o con permiso escrito.</div></div>
+      <div class="fgrid"><div class="frow"><label>Timeout (seg) <span class="tip" data-tip="Tiempo máximo esperando el handshake. Si el AP tiene clientes activos suele bastar 60-120s.">?</span></label><input id="hs-to" class="inp" type="number" value="120"></div><div class="frow"><label>Paquetes deauth <span class="tip" data-tip="Cuántas tramas de desautenticación enviar para forzar la reconexión del cliente. 5-10 suele bastar; más es más ruidoso y detectable.">?</span></label><input id="hs-dp" class="inp" type="number" value="10"></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="crow" style="margin:0"><input type="checkbox" id="hs-da" checked><label for="hs-da">Enviar deauth antes de capturar</label></div>
+        <button class="btn btn-g btn-sm" id="hs-btn" onclick="startHS()" style="white-space:nowrap">${ic('play',12)} Capturar Handshake</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--b0);margin:14px 0 12px">
+      <div style="margin:0 0 12px">
+        <div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:11px">${ic('zap',11)} Deauth Manual (bajo demanda)</div>
         <div class="fgrid"><div class="frow"><label>Interfaz</label><select id="da-if" class="inp">${ifaces.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}</select></div><div class="frow"><label>BSSID</label><input id="da-bssid" class="inp" placeholder="AA:BB:CC:DD:EE:FF"></div></div>
         <div class="fgrid"><div class="frow"><label>MAC cliente (vacío=broadcast)</label><input id="da-cli" class="inp" placeholder="FF:FF:FF:FF:FF:FF"></div><div class="frow"><label>Paquetes</label><input id="da-pkts" class="inp" type="number" value="50"></div></div>
-        <button class="btn btn-d btn-sm" style="width:100%" onclick="sendDeauth()">${ic('stop')} Enviar Deauth</button>
+        <div style="text-align:center;margin-top:6px"><button class="btn btn-d btn-sm" onclick="sendDeauth()">${ic('zap',12)} Enviar Deauth</button></div>
       </div>
-      <button class="btn btn-g" style="width:100%" id="hs-btn" onclick="startHS()">${ic('play')} Capturar Handshake</button>
     </div>
     <div class="card">
       <div class="ctitle">${ic('key')} Resultado</div>
@@ -28,8 +30,21 @@ async function sniffing(){
       <div id="hs-res-empty" class="empty" style="padding:24px">${ic('key',36)}<h3>Sin resultado</h3><p>Inicia una captura</p></div>
       <div id="hs-res" style="display:none"></div>
     </div>
-  </div></div>`);}
+  </div></div>`);
+  try{const _hs=localStorage.getItem('hsRes');if(_hs&&_hs.trim()){const e0=document.getElementById('hs-res-empty'),r0=document.getElementById('hs-res');if(e0)e0.style.display='none';if(r0){r0.style.display='block';r0.innerHTML=_hs;}}}catch(e){}
+}
 // ======== CRACK (cualquier captura: handshake o PMKID) ========
+function crOK(c){return (c.has_pmkid||c.has_handshake||/\.(22000|16800)$/i.test(c.filename||''))?1:0;}
+function crFileOptions(arr,cur){
+  const usable=(arr||[]).filter(c=>!/\.csv$/i.test(c.filename||''));   // los .csv no son crackeables
+  usable.sort((a,b)=>crOK(b)-crOK(a));                                  // primero las que tienen material
+  const sl=v=>v===cur?' selected':'';
+  return `<option value=""${sl('')}>— Selecciona una captura —</option>`+usable.map(c=>{
+    const pk=c.has_pmkid||/\.(22000|16800)$/i.test(c.filename||'');
+    const tag=pk?'⚡ PMKID':(c.has_handshake?'✓ HANDSHAKE':'·  sin confirmar');
+    return `<option value="${c.filepath}" data-pmkid="${pk?1:0}" data-essid="${(c.target_essid||'').replace(/"/g,'&quot;')}"${sl(c.filepath)}>${tag}  —  ${c.filename}${c.target_essid?'  ('+c.target_essid+')':''}</option>`;
+  }).join('')+`<option value="__custom"${sl('__custom')}>✎  Ruta personalizada…</option>`;
+}
 async function crack(){
   let caps=[],wls=[];
   try{[caps,wls]=await Promise.all([A.caps(),A.wls()]);}catch{}
@@ -38,9 +53,8 @@ async function crack(){
     <div class="card">
       <div class="ctitle">${ic('zap')} Crack — Cualquier captura</div>
       <div class="hint">${ic('info',11)}Crackea offline cualquier material capturado: un <b>handshake</b> (de Sniffing o AP-Less) o un <b>PMKID</b>. El tipo se detecta solo por el archivo. Con GPU usa hashcat; si no, aircrack-ng por CPU.</div>
-      <div class="frow"><label>Archivo de captura <span class="tip" data-tip="Lista todas las capturas disponibles (handshakes y PMKID). También puedes indicar una ruta manual con «Ruta personalizada».">?</span></label>
-        <select id="cr-file" class="inp" onchange="onCrFile()"><option value="">— Selecciona —</option>${capArr.map(c=>{const pk=c.has_pmkid||/\.(22000|16800)$/i.test(c.filename||'');const tag=pk?' ⚡PMKID':(c.has_handshake?' ✓HS':'');return `<option value="${c.filepath}" data-pmkid="${pk?1:0}" data-essid="${(c.target_essid||'').replace(/"/g,'&quot;')}">${c.filename}${c.target_essid?' ('+c.target_essid+')':''}${tag}</option>`;}).join('')}<option value="__custom">Ruta personalizada…</option></select>
-        <button class="btn btn-gh btn-xs" style="margin-top:4px" onclick="reloadCrF()">${ic('refresh',11)} Recargar archivos</button>
+      <div class="frow"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px"><label style="margin:0">Archivo de captura <span class="tip" data-tip="Solo capturas crackeables (handshakes y PMKID); los .csv de escaneo no aparecen. ✓ HANDSHAKE / ⚡ PMKID marcan las que tienen material confirmado. También puedes indicar una ruta manual.">?</span></label><button class="btn btn-gh btn-xs btn-ico" id="cr-reload" title="Recargar la lista de capturas" onclick="reloadCrF(this)">${ic('refresh',12)}</button></div>
+        <select id="cr-file" class="inp" onchange="onCrFile()">${crFileOptions(capArr,'')}</select>
       </div>
       <div id="cr-cust-file-wrap" style="display:none" class="frow"><label>Ruta del archivo</label><input id="cr-cust-file" class="inp" placeholder="/data/captures/red.cap  ·  /data/pmkid/red.22000"></div>
       <div class="frow"><label>Tipo <span class="tip" data-tip="Auto detecta PMKID (.22000/.16800) frente a handshake por el archivo. Puedes forzarlo si hace falta.">?</span></label>
@@ -53,9 +67,10 @@ async function crack(){
     </div>
     <div class="card"><div class="ctitle">${ic('zap')} Resultado</div><div id="cr-res" class="empty" style="padding:24px">${ic('zap',36)}<h3>Sin resultado</h3><p>Selecciona una captura y una wordlist</p></div></div>
   </div></div>`);
+  try{const _cr=localStorage.getItem('crRes');if(_cr&&_cr.trim()){const el=document.getElementById('cr-res');if(el){el.className='';el.removeAttribute('style');el.innerHTML=_cr;}}}catch(e){}
   onCrFile();}
 function onCrFile(){const sel=document.getElementById('cr-file');if(!sel)return;const v=sel.value;const cw=document.getElementById('cr-cust-file-wrap');if(cw)cw.style.display=v==='__custom'?'block':'none';const opt=sel.options[sel.selectedIndex];if(opt&&v&&v!=='__custom'){const es=opt.getAttribute('data-essid');const ee=document.getElementById('cr-essid');if(es&&ee&&!ee.value)ee.value=es;}}
-async function reloadCrF(){try{const caps=await A.caps();const sel=document.getElementById('cr-file');if(!sel)return;const cur=sel.value;const arr=Array.isArray(caps)?caps:[];sel.innerHTML=`<option value="">— Selecciona —</option>`+arr.map(c=>{const pk=c.has_pmkid||/\.(22000|16800)$/i.test(c.filename||'');const tag=pk?' ⚡PMKID':(c.has_handshake?' ✓HS':'');return `<option value="${c.filepath}" data-pmkid="${pk?1:0}" data-essid="${(c.target_essid||'').replace(/"/g,'&quot;')}" ${c.filepath===cur?'selected':''}>${c.filename}${c.target_essid?' ('+c.target_essid+')':''}${tag}</option>`;}).join('')+`<option value="__custom" ${cur==='__custom'?'selected':''}>Ruta personalizada…</option>`;toast('Recargado','success');}catch(e){toast(e.message,'error');}}
+async function reloadCrF(btn){const ic0=btn?btn.innerHTML:null;if(btn){btn.disabled=true;btn.innerHTML='<div class="spin"></div>';}try{const caps=await A.caps();const sel=document.getElementById('cr-file');if(sel){const cur=sel.value;sel.innerHTML=crFileOptions(Array.isArray(caps)?caps:[],cur);}toast('Lista de capturas actualizada','success');}catch(e){toast(e.message,'error');}if(btn){btn.disabled=false;btn.innerHTML=ic0;}}
 async function startHS(){
   const iface=document.getElementById('hs-if')?.value,bssid=document.getElementById('hs-bssid')?.value?.trim(),essid=document.getElementById('hs-essid')?.value?.trim(),ch=parseInt(document.getElementById('hs-ch')?.value)||6,to=parseInt(document.getElementById('hs-to')?.value)||120,da=document.getElementById('hs-da')?.checked,dp=parseInt(document.getElementById('hs-dp')?.value)||10;
   if(!bssid){toast('BSSID obligatorio','warn');return;}
@@ -67,6 +82,7 @@ async function startHS(){
   clearInterval(_hsTimer);if(cdown)cdown.style.display='none';
   if(res){res.style.display='block';res.innerHTML=`<div class="${r.handshake_captured?'alert as':'alert aw'}" style="margin-bottom:12px">${r.handshake_captured?ic('check'):ic('x')}<div><strong>${r.handshake_captured?'¡Handshake capturado!':'Sin handshake'}</strong></div></div>${r.capture_file?`<div style="margin-bottom:8px;font-size:.76rem"><span style="color:var(--t2)">Archivo:</span> <span class="mono" style="color:var(--g)">${r.capture_file}</span></div>`:''}<div style="font-size:.75rem;color:var(--t2)">Duración: ${r.duration_seconds}s · Deauth: ${r.deauth_sent?'Sí':'No'}</div>${r.handshake_captured?`<button class="btn btn-gh btn-sm" style="margin-top:10px" onclick="setIP({'cr-file':'${r.capture_file}','cr-bssid':'${bssid}'});goto('crack')">${ic('zap',12)} Ir a Crack →</button>`:''}`;}  toast(r.handshake_captured?'¡Handshake!':'Sin handshake',r.handshake_captured?'success':'warn');}
   catch(e){clearInterval(_hsTimer);if(cdown)cdown.style.display='none';toast(e.message,'error');if(res){res.style.display='block';res.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}}
+  try{if(res&&res.innerHTML.trim())localStorage.setItem('hsRes',res.innerHTML);}catch(e2){}
   if(btn)btn.disabled=false;}
 async function startCrack(){
   const sel=document.getElementById('cr-file');let file=sel?.value;
@@ -76,16 +92,18 @@ async function startCrack(){
   const wl=document.getElementById('cr-wl')?.value,cust=document.getElementById('cr-cust')?.value?.trim();
   let typ=document.getElementById('cr-type')?.value||'auto';
   if(!file||!bssid){toast('Archivo y BSSID obligatorios','warn');return;}
+  if(wl==='__custom'&&!cust){toast('Indica la ruta de la wordlist personalizada','warn');return;}
   if(typ==='auto'){const opt=sel&&sel.options[sel.selectedIndex];const pk=(opt&&opt.getAttribute&&opt.getAttribute('data-pmkid')==='1')||/\.(22000|16800)$/i.test(file);typ=pk?'pmkid':'handshake';}
   const btn=document.getElementById('cr-btn');if(btn)btn.disabled=true;
   const el=document.getElementById('cr-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Crackeando ${typ==='pmkid'?'PMKID':'handshake'}...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;
   try{
     let r;
     if(typ==='pmkid'){r=await A.pmkidCrack({pmkid_file:file,target_bssid:bssid,target_essid:essid||null,wordlist:wl==='__custom'?'rockyou.txt':wl});}
-    else{r=await A.crack({capture_file:file,target_bssid:bssid,wordlist:wl==='__custom'?null:wl,custom_wordlist_path:wl==='__custom'?cust:null});}
+    else{r=await A.crack({capture_file:file,target_bssid:bssid,wordlist:wl==='__custom'?'rockyou.txt':wl,custom_wordlist_path:wl==='__custom'?cust:null});}
     if(el)el.innerHTML=`<div class="${r.success?'alert as':'alert aw'}" style="margin-bottom:12px">${r.success?ic('check'):ic('x')}<div><strong>${r.success?'¡Contraseña encontrada!':'Sin resultado'}</strong> <span class="badge b-c" style="margin-left:4px">${typ==='pmkid'?'PMKID':'HANDSHAKE'}</span></div></div>${r.success?`<div style="padding:14px;background:var(--bg0);border-radius:8px;border:1px solid var(--g);text-align:center;margin-bottom:12px"><div style="font-size:.62rem;color:var(--t2);margin-bottom:4px;letter-spacing:.1em">PASSPHRASE</div><div style="font-family:'Orbitron',monospace;font-size:1.2rem;color:var(--g);word-break:break-all">${r.key}</div></div>`:''}<div style="font-size:.74rem;color:var(--t2)">${r.duration_seconds!=null?'Duración: '+r.duration_seconds+'s':''}${r.keys_tried!=null?' · Claves: '+(r.keys_tried||0).toLocaleString():''}</div>`;
     toast(r.success?`Pass: ${r.key}`:'Sin resultado',r.success?'success':'info');
   }catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}
+  try{if(el)localStorage.setItem('crRes',el.innerHTML);}catch(e2){}
   if(btn)btn.disabled=false;}
 async function sendDeauth(){const iface=document.getElementById('da-if')?.value,bssid=(document.getElementById('da-bssid')?.value||document.getElementById('hs-bssid')?.value||'').trim(),cli=document.getElementById('da-cli')?.value?.trim(),pkts=parseInt(document.getElementById('da-pkts')?.value)||50;if(!bssid){toast('BSSID obligatorio','warn');return;}try{const r=await A.deauth({interface:iface,target_bssid:bssid,client_mac:cli||null,packets:pkts,reason:'Manual deauth'});toast(`Deauth: ${r.packets_sent} paquetes → ${r.target}`,'success');}catch(e){toast(e.message,'error');}}
 // ======== ADVANCED ========

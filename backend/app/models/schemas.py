@@ -216,7 +216,7 @@ class HandshakeCaptureRequest(BaseModel):
 class WpaCrackRequest(BaseModel):
     capture_file: str
     target_bssid: str
-    wordlist: str = "rockyou.txt"
+    wordlist: Optional[str] = "rockyou.txt"   # puede venir null si se usa custom_wordlist_path
     custom_wordlist_path: Optional[str] = None
 
 

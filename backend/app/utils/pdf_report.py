@@ -259,11 +259,15 @@ def _finding_block(i, f, st):
         parts.append(Spacer(1, 4))
         parts.append(Paragraph(label.upper(), st["label"]))
         if mono:
-            box = Table([[Paragraph(_esc(text).replace("\n", "<br/>"), st["mono"])]], colWidths=[15.5 * cm])
+            # Una fila por línea: la tabla puede partirse entre páginas (una celda
+            # única no puede, y desbordaba con evidencias largas p.ej. del recon).
+            rows = [[Paragraph(_esc(ln) or "&nbsp;", st["mono"])] for ln in str(text).split("\n")]
+            box = Table(rows, colWidths=[15.5 * cm])
             box.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f4f6f8")),
                                      ("BOX", (0, 0), (-1, -1), 0.4, LIGHT),
                                      ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-                                     ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
+                                     ("TOPPADDING", (0, 0), (-1, -1), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+                                     ("TOPPADDING", (0, 0), (-1, 0), 5), ("BOTTOMPADDING", (0, -1), (-1, -1), 5)]))
             parts.append(box)
         else:
             parts.append(Paragraph(_esc(text).replace("\n", "<br/>"), st["body"]))

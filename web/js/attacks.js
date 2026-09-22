@@ -2,7 +2,7 @@
 // ======== ATTACKS ========
 async function attacks(){
   let ifaces=[];try{ifaces=await A.ifaces();}catch{}
-  setC(`<div class="sup"><div class="alert aw" style="margin-bottom:14px">${ic('warn')}<div><strong>Solo para uso legal y autorizado</strong> en redes propias o con permiso escrito.</div></div>
+  setC(`<div class="sup">
   <div class="tabs" id="att-tabs"><div class="tab active" onclick="swTab('att-tabs','att-tc',0)">Evil Twin</div><div class="tab" onclick="swTab('att-tabs','att-tc',1)">MITM</div><div class="tab" onclick="swTab('att-tabs','att-tc',2)">Flujos</div></div>
   <div class="tc active" id="att-tc-0">${etT(ifaces)}</div>
   <div class="tc" id="att-tc-1">${mitmT(ifaces)}</div>
@@ -51,7 +51,9 @@ async function captures(){
   setC(`<div style="display:flex;align-items:center;gap:10px;color:var(--t2)"><div class="spin"></div> Cargando...</div>`);
   const sid=ST.activeSession?.id;let caps=[];try{caps=await A.caps(sid||null);}catch(e){toast(e.message,'error');}
   const arr=Array.isArray(caps)?caps:[];
-  setC(`<div class="sup">${sid?`<div class="alert ai" style="margin-bottom:12px">${ic('info')}<div>Sesión: <strong>${ST.activeSession.name}</strong></div></div>`:''}<div class="card"><div class="ctitle">${ic('download')} Capturas (${arr.length})</div>${!arr.length?`<div class="empty" style="padding:38px">${ic('download',40)}<h3>Sin capturas</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Tipo</th><th>Red</th><th>Tamaño</th><th>HS</th><th>PMKID</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>${arr.map(c=>`<tr><td class="mono" style="font-size:.7rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.filepath}">${c.filename}</td><td><span class="badge b-c">${c.file_type||'—'}</span></td><td style="font-size:.76rem">${c.target_essid||'—'}</td><td class="mono" style="font-size:.72rem">${fb(c.size_bytes)}</td><td>${c.has_handshake?`<span class="badge b-g">${ic('check',11)} SÍ</span>`:`<span class="badge b-x">NO</span>`}</td><td>${c.has_pmkid?`<span class="badge b-g">${ic('check',11)} SÍ</span>`:`<span class="badge b-x">NO</span>`}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(c.created_at)}</td><td><div style="display:flex;gap:4px"><button class="btn btn-p btn-xs" onclick="checkCap('${c.filepath}','${c.filename}')">${ic('eye',11)} Verificar</button><button class="btn btn-d btn-xs btn-ico" onclick="delCap('${c.filepath}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div></div>`);}
+  const wlCrk=c=>['cap','pcap','pcapng','22000','16800','hc22000','hccapx'].includes((c.file_type||'').toLowerCase());
+  const hsCell=(has,crk)=>crk?(has?`<span class="badge b-g" style="font-weight:700;box-shadow:0 0 7px -1px var(--g)">${ic('check',11)} SÍ</span>`:`<span class="badge b-x" style="opacity:.5">NO</span>`):`<span style="color:var(--t3)">—</span>`;
+  setC(`<div class="sup"><div class="card"><div class="ctitle">${ic('download')} Capturas (${arr.length})</div>${!arr.length?`<div class="empty" style="padding:38px">${ic('download',40)}<h3>Sin capturas</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Tipo</th><th>Red</th><th>Tamaño</th><th>HS</th><th>PMKID</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>${arr.map(c=>`<tr><td class="mono" style="font-size:.7rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.filepath}">${c.filename}</td><td><span class="badge b-c">${c.file_type||'—'}</span></td><td style="font-size:.76rem">${c.target_essid||'—'}</td><td class="mono" style="font-size:.72rem">${fb(c.size_bytes)}</td><td>${hsCell(c.has_handshake,wlCrk(c))}</td><td>${hsCell(c.has_pmkid,wlCrk(c))}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(c.created_at)}</td><td><div style="display:flex;gap:4px">${wlCrk(c)?`<button class="btn btn-p btn-xs" onclick="checkCap('${c.filepath}','${c.filename}')">${ic('eye',11)} Verificar</button>`:''}<button class="btn btn-d btn-xs btn-ico" onclick="delCap('${c.filepath}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div></div>`);}
 async function checkCap(fp,fn){
   showModal(`Verificando — ${fn}`,`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Analizando...</div>`,'',true);
   try{const r=await A.checkHS(fp);showModal(`Análisis — ${fn}`,`<div style="display:flex;gap:9px;margin-bottom:14px;flex-wrap:wrap">
@@ -112,16 +114,12 @@ async function wordlists(){
     ]},
   ];
   setC(`<div class="sup"><div class="tabs" id="wl-tabs"><div class="tab active" onclick="swTab('wl-tabs','wl-tc',0)">${ic('zap',13)} Generar</div><div class="tab" onclick="swTab('wl-tabs','wl-tc',1)">${ic('download',13)} Diccionarios existentes (${wls.total||0})</div></div>
-  <div class="tc active" id="wl-tc-0"><div class="g2" style="margin-bottom:16px;align-items:start">
-    <div class="card" id="wl-form" data-pp="wl-form">
+  <div class="tc active" id="wl-tc-0">
+    <div class="card" id="wl-form" data-pp="wl-form" style="margin-bottom:16px">
       <div class="ctitle">${ic('zap')} Generar Wordlist</div>
-      <div class="frow"><label>Palabras semilla</label>
+      <div class="frow"><label>Palabras semilla <span class="tip" data-tip="Escribe una palabra y pulsa Enter (o coma) para añadirla como etiqueta. Repite con cada semilla.">?</span></label>
         <div class="seed-box" id="sbox" onclick="document.getElementById('sinput').focus()">
           <input id="sinput" placeholder="Escribe y pulsa Enter o usa comas..." onkeydown="hSK(event)" oninput="hSI(event)">
-        </div>
-        <div style="display:flex;gap:5px;margin-top:5px">
-          <input id="spaste" class="inp" style="flex:1" placeholder="Pegar varias separadas por coma: nombre,empresa,2024">
-          <button class="btn btn-gh btn-xs" onclick="addPaste()">Añadir</button>
         </div>
       </div>
       <div class="hint">${ic('info',11)}Introduce semillas de OSINT del objetivo: nombre, empresa, mascota, hijos, pareja, año de nacimiento, equipo, ciudad favorita. El motor las combina con mutaciones de fugas reales (leet, números intercalados, duplicados, combinaciones, base española y nombres) para generar <b>millones de candidatas</b> desde 3 semillas.</div>
@@ -146,12 +144,14 @@ async function wordlists(){
       <div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn btn-gh btn-sm" onclick="doEstWL()">Estimar</button><button class="btn btn-gh btn-sm" onclick="doPrevWL()">Preview</button><button class="btn btn-g btn-sm" style="flex:1" id="wl-gen-btn" onclick="doGenWL()">${ic('zap')} Generar</button></div>
       <div id="wl-est" style="margin-top:9px"></div>
     </div>
-    <div class="card"><div class="ctitle">${ic('eye')} Preview / Resultado</div><div id="wl-prev" class="empty" style="padding:24px">${ic('zap',36)}<h3>Sin preview</h3><p>Usa Preview o Generar</p></div></div>
-  </div></div>
+    <div class="card"><div class="ctitle">${ic('eye')} Vista previa / Resultado</div><div id="wl-prev" class="empty" style="padding:24px">${ic('zap',36)}<h3>Sin vista previa</h3><p>Pulsa Vista previa o Generar</p></div></div>
+  </div>
   <div class="tc" id="wl-tc-1"><div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px"><div class="ctitle" style="margin-bottom:0">${ic('download')} Wordlists Disponibles</div><button class="btn btn-gh btn-sm" onclick="wordlists()">${ic('refresh',12)} Actualizar</button></div><div style="font-size:.76rem;color:var(--t2);margin-bottom:12px">${wls.total||0} archivos · ${wls.total_size_human||'—'} · <span class="mono">${wls.directory||'—'}</span></div>
   ${!wlArr.length?`<div class="empty" style="padding:28px">${ic('download',36)}<h3>Sin wordlists</h3></div>`:`<div class="twrap"><table><thead><tr><th>Archivo</th><th>Líneas</th><th>Tamaño</th><th>Muestra</th><th>Modificado</th><th></th></tr></thead><tbody>${wlArr.map(w=>`<tr><td class="mono">${w.filename}</td><td class="mono"><strong>${(w.lines||0).toLocaleString()}</strong></td><td class="mono">${w.size_human||fb(w.size_bytes)}</td><td style="font-size:.68rem;color:var(--t2);font-family:'JetBrains Mono',monospace">${(w.sample_first||[]).slice(0,4).join(', ')}</td><td class="mono" style="font-size:.7rem;color:var(--t2)">${fd(w.modified_at)}</td><td><div style="display:flex;gap:4px"><a class="btn btn-gh btn-xs" href="${API}/wordlists/${w.filename}/download" target="_blank">${ic('download',11)}</a><button class="btn btn-d btn-xs btn-ico" onclick="doDelWL('${w.filename}')">${ic('trash',11)}</button></div></td></tr>`).join('')}</tbody></table></div>`}</div></div>
   </div>`);
-  restFP('wl-form');renderSeeds();}
+  restFP('wl-form');renderSeeds();
+  // sincroniza el resaltado visual de las mutaciones con el estado restaurado
+  document.querySelectorAll('#wl-form .mitem').forEach(m=>{const cb=m.querySelector('input[type=checkbox]');if(cb)m.classList.toggle('on',cb.checked);});}
 function togM(el,id){const cb=document.getElementById(id);if(cb){cb.checked=!cb.checked;el.classList.toggle('on',cb.checked);persistInput(cb);}}
 function renderSeeds(){const box=document.getElementById('sbox');if(!box)return;const inp=document.getElementById('sinput');box.querySelectorAll('.stag').forEach(e=>e.remove());_seeds.forEach(s=>{const t=document.createElement('span');t.className='stag';t.innerHTML=`${s}<span class="stag-x" onclick="rmSeed('${s}')">×</span>`;box.insertBefore(t,inp);});if(inp)inp.placeholder=_seeds.length?'Añadir más...':'Escribe y pulsa Enter o usa comas...';}
 function addSeed(w){w=w.trim();if(!w||_seeds.includes(w))return;_seeds.push(w);localStorage.setItem('wl-seeds',JSON.stringify(_seeds));renderSeeds();}
@@ -163,7 +163,24 @@ const WL_BOOL_IDS=['use_lowercase','use_uppercase','use_capitalize','use_alterna
 function getWLC(){const M={};WL_BOOL_IDS.forEach(k=>{const e=document.getElementById(k);M[k]=e?e.checked:false;});return{seed_words:_seeds,output_filename:document.getElementById('wl-name')?.value||'custom.txt',min_length:parseInt(document.getElementById('wl-min')?.value)||6,max_length:parseInt(document.getElementById('wl-max')?.value)||32,leet_intensity:document.getElementById('wl-leet')?.value||'medium',number_max_length:parseInt(document.getElementById('wl-numlen')?.value)||4,max_total:parseInt(document.getElementById('wl-maxtotal')?.value)||10000000,...M};}
 function wlPreset(id){const p=WLPRESETS.find(x=>x.id===id);if(!p)return;document.querySelectorAll('.wl-preset').forEach(e=>e.classList.remove('on'));document.getElementById('wlp-'+id)?.classList.add('on');Object.entries(p.cfg).forEach(([k,v])=>{const e=document.getElementById(k);if(e){e.checked=v;e.closest('.mitem')?.classList.toggle('on',v);}});const leet=document.getElementById('wl-leet');if(leet&&p.leet)leet.value=p.leet;document.getElementById('wl-preset')&&(document.getElementById('wl-preset').value='');toast(`Preset "${p.l}" aplicado`,'success');if(_seeds.length)doEstWL();}
 async function doEstWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const el=document.getElementById('wl-est');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--t2);font-size:.76rem"><div class="spin"></div> Estimando...</div>`;try{const r=await A.estimateWL(getWLC());if(el)el.innerHTML=`<div style="font-size:.78rem;color:var(--t1);display:flex;gap:12px;flex-wrap:wrap"><div>Total: <strong style="color:var(--g)">${r.estimated_count_human}</strong></div><div>Tamaño: <strong>${r.estimated_size_human}</strong></div><div>Tiempo: <strong>~${r.estimated_time_seconds}s</strong></div></div>`;}catch(e){toast(e.message,'error');if(el)el.innerHTML='';}}
-async function doPrevWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const el=document.getElementById('wl-prev');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--t2)"><div class="spin"></div> Generando preview...</div>`;try{const r=await A.previewWL(getWLC());const cats=Object.entries(r.categories||{});if(el)el.innerHTML=`<div style="max-height:360px;overflow-y:auto">${cats.map(([cat,s])=>`<div style="margin-bottom:10px"><div style="font-size:.62rem;color:var(--t2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">${cat}</div><div style="display:flex;gap:4px;flex-wrap:wrap">${s.slice(0,10).map(w=>`<span class="kbd">${w}</span>`).join('')}</div></div>`).join('')}</div>`;}catch(e){toast(e.message,'error');}}
+async function doPrevWL(){
+  if(!_seeds.length){toast('Añade palabras semilla','warn');return;}
+  const el=document.getElementById('wl-prev');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--t2)"><div class="spin"></div> Generando vista previa...</div>`;
+  try{
+    const r=await A.previewWL(getWLC());
+    const cats=Object.entries(r.categories||{}).filter(([k,v])=>v&&v.length);
+    if(!cats.length){if(el)el.innerHTML=`<div class="empty" style="padding:20px">${ic('zap',30)}<h3>Sin resultados</h3><p>Activa alguna mutación</p></div>`;return;}
+    // muestra VARIADA: repartida a lo largo de cada categoría, no solo las primeras
+    const spread=(arr,n)=>{if(arr.length<=n)return arr.slice();const st=arr.length/n,out=[];for(let i=0;i<n;i++)out.push(arr[Math.floor(i*st)]);return out;};
+    if(el)el.innerHTML=`
+      <div style="font-size:.72rem;color:var(--t2);margin-bottom:13px">Muestra variada de <strong style="color:var(--t1)">${cats.length}</strong> categorías de mutación. La generación real produce muchísimas más.</div>
+      <div style="display:flex;flex-direction:column;gap:13px">${cats.map(([cat,s])=>`
+        <div>
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><span style="font-size:.63rem;color:var(--c);text-transform:uppercase;letter-spacing:.12em;font-weight:700;white-space:nowrap">${cat}</span><span style="flex:1;height:1px;background:var(--b0)"></span><span class="badge b-x" style="font-size:.56rem">${s.length}</span></div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">${spread(s,8).map(w=>`<span class="kbd">${(''+w).replace(/</g,'&lt;')}</span>`).join('')}</div>
+        </div>`).join('')}</div>`;
+  }catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}
+}
 async function doGenWL(){if(!_seeds.length){toast('Añade palabras semilla','warn');return;}const btn=document.getElementById('wl-gen-btn');if(btn)btn.disabled=true;const el=document.getElementById('wl-prev');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> Generando...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;try{const r=await A.genWL(getWLC());if(el)el.innerHTML=`<div class="alert as" style="margin-bottom:12px">${ic('check')}<div><strong>¡Generada!</strong> ${(r.total_passwords||0).toLocaleString()} contraseñas en ${r.elapsed_seconds}s</div></div><div style="font-size:.76rem;color:var(--t2)">Archivo: <span class="mono" style="color:var(--g)">${r.path}</span></div><div style="font-size:.76rem;color:var(--t2)">Tamaño: ${r.file_size_human} · ${Math.round(r.rate_per_second||0).toLocaleString()} pass/s</div>`;toast(`Wordlist: ${(r.total_passwords||0).toLocaleString()} entradas`,'success');wordlists();}catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;if(btn)btn.disabled=false;}}
 function doDelWL(fn){confirmDlg(`¿Eliminar "${fn}"?`,async()=>{try{await A.delWL(fn);toast('Eliminada','success');wordlists();}catch(e){toast(e.message,'error');}});}
 async function applyPreset(sel){const id=sel.value;if(!id)return;const p=_presets.find(x=>x.id===id);if(!p?.config)return;const c=p.config;document.querySelectorAll('.wl-preset').forEach(e=>e.classList.remove('on'));WL_BOOL_IDS.forEach(k=>{if(k in c){const e=document.getElementById(k);if(e){e.checked=c[k];e.closest('.mitem')?.classList.toggle('on',c[k]);}}});if(c.min_length){const e=document.getElementById('wl-min');if(e)e.value=c.min_length;}if(c.max_length){const e=document.getElementById('wl-max');if(e)e.value=c.max_length;}if(c.leet_intensity){const e=document.getElementById('wl-leet');if(e)e.value=c.leet_intensity;}if(c.number_max_length){const e=document.getElementById('wl-numlen');if(e)e.value=c.number_max_length;}if(c.max_total){const e=document.getElementById('wl-maxtotal');if(e)e.value=c.max_total;}toast(`Preset "${p.label}" aplicado`,'success');await doEstWL();}
@@ -187,7 +204,7 @@ async function system(){
     <div class="tc active" id="sys-tc-0">${sysInfoHTML(sys,pf)}</div>
     <div class="tc" id="sys-tc-1"><div id="sys-procs">${sysProcsHTML(procs)}</div></div>
     <div class="tc" id="sys-tc-2">${sysToolsHTML(byC)}</div>
-  </div>`);}
+  </div>`);loadDataUsage();}
 function sysInfoHTML(sys,pf){
   const rows=[['Hostname',sys.hostname,'var(--c)'],['Distribución',sys.distro,null],['Kernel',sys.kernel||sys.release,null],['Arquitectura',sys.arch,null],['Usuario',sys.user,null],['Python',sys.python||sys.python_version,null],['Uptime',fmtUptime(sys.uptime_seconds),null]];
   return `<div class="g2" style="margin-bottom:14px;align-items:start">
@@ -214,8 +231,14 @@ function sysInfoHTML(sys,pf){
       </div>
       <div class="card">
         <div class="ctitle">${ic('search')} Búsqueda OUI / Fabricante</div>
-        <div class="hint" style="margin-bottom:7px">${ic('info',11)}Introduce una MAC para identificar el fabricante y saber si está aleatorizada.</div>
+        <div class="hint" style="margin-bottom:7px">${ic('info',11)}Introduce una MAC para identificar el fabricante. Ojo: los móviles modernos usan <b>MAC aleatorizada</b> y no son identificables (privacidad).</div>
         <div style="display:flex;gap:7px"><input id="oui-in" class="inp" placeholder="AA:BB:CC:DD:EE:FF" style="flex:1" onkeydown="if(event.key==='Enter')doOUI(this.value.trim())"><button class="btn btn-p" onclick="doOUI(document.getElementById('oui-in').value.trim())">Buscar</button></div>
+        <button class="btn btn-gh btn-xs" style="margin-top:8px;width:100%" onclick="reloadOuiDB(this)">${ic('download',11)} Actualizar base de datos OUI (IEEE) para más precisión</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px"><div class="ctitle" style="margin-bottom:0">${ic('folder')} Datos del backend</div><button class="btn btn-gh btn-xs" onclick="loadDataUsage()" title="Recargar uso de disco">${ic('refresh',12)}</button></div>
+        <div id="sys-data-usage" style="font-size:.76rem;color:var(--t2)">Cargando uso de disco…</div>
+        <button class="btn btn-d btn-sm" style="width:100%;margin-top:11px" onclick="wipeAllData()">${ic('trash',12)} Eliminar TODOS los datos</button>
       </div>
     </div>
   </div>`;}
@@ -235,7 +258,40 @@ function sysToolsHTML(byC){
 async function refreshProcs(){const el=document.getElementById('sys-procs');if(!el)return;try{const procs=await A.procs();el.innerHTML=sysProcsHTML(procs);}catch(e){toast(e.message,'error');}}
 async function cancelPS(id){try{await A.cancelProc(id);toast('Proceso detenido','success');refreshProcs();}catch(e){toast(e.message,'error');}}
 async function killAllProcs(){const procs=await A.procs().catch(()=>[]);const run=procs.filter(p=>p.status==='running');if(!run.length){toast('No hay procesos activos','info');return;}confirmDlg(`¿Matar los ${run.length} procesos activos?`,async()=>{for(const p of run){await A.cancelProc(p.id).catch(()=>{});}toast('Procesos detenidos','success');refreshProcs();});}
-async function doOUI(mac){if(!mac){toast('Introduce una MAC','warn');return;}try{const r=await A.oui(mac);showModal('OUI / Fabricante',`<div style="padding:13px;background:var(--bg0);border-radius:8px;border:1px solid var(--b1);margin-bottom:10px"><div class="mono" style="font-size:1rem;color:var(--c);margin-bottom:7px">${r.mac}</div><div style="font-size:.84rem;margin-bottom:5px"><span style="color:var(--t2)">Fabricante:</span> <strong>${r.manufacturer||'Desconocido'}</strong></div><div style="font-size:.8rem"><span style="color:var(--t2)">OUI:</span> <span class="mono">${r.oui||'—'}</span></div></div>${r.is_randomized?`<div class="alert aw">${ic('warn')}<div>MAC aleatorizada (privacidad)</div></div>`:`<span class="badge b-g">✓ MAC estática</span>`}`,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`);}catch(e){toast(e.message,'error');}}
+async function doOUI(mac){
+  if(!mac){toast('Introduce una MAC','warn');return;}
+  try{
+    const r=await A.oui(mac);
+    const rand=r.is_randomized,vendor=(r.manufacturer&&!/random/i.test(r.manufacturer))?r.manufacturer:null;
+    const body=`<div style="padding:14px;background:var(--bg0);border-radius:8px;border:1px solid var(--b1);margin-bottom:12px">
+        <div class="mono" style="font-size:1.05rem;color:var(--c);margin-bottom:9px">${r.mac}</div>
+        <div style="font-size:.86rem;margin-bottom:6px"><span style="color:var(--t2)">Fabricante:</span> <strong>${vendor||(rand?'No identificable':'Desconocido')}</strong></div>
+        <div style="font-size:.8rem"><span style="color:var(--t2)">OUI:</span> <span class="mono">${r.oui||'—'}</span></div>
+      </div>
+      ${rand
+        ?`<div class="alert aw" style="margin-bottom:0">${ic('warn')}<div><strong>MAC aleatorizada (privacidad).</strong> El fabricante real no es identificable: los móviles modernos (iOS/Android) usan una MAC aleatoria distinta por red. No es un fallo del lookup — es el comportamiento esperado.</div></div>`
+        :vendor
+          ?`<div class="alert as" style="margin-bottom:0">${ic('check')}<div>MAC de fabricante real identificada.</div></div>`
+          :`<div class="alert ai" style="margin-bottom:0">${ic('info')}<div>OUI no encontrado. Pulsa <strong>Actualizar base de datos OUI</strong> (abajo, en la tarjeta de búsqueda) para descargar la lista completa del IEEE y afinar los resultados.</div></div>`}`;
+    showModal('OUI / Fabricante',body,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`);
+  }catch(e){toast(e.message,'error');}
+}
+async function reloadOuiDB(btn){const t=btn?btn.innerHTML:null;if(btn){btn.disabled=true;btn.innerHTML='<div class="spin"></div> Descargando base de datos…';}try{const r=await A.ouiDownload();toast(r.success?'Base de datos OUI actualizada — lookups más precisos':'No se pudo descargar (¿sin internet o sin wget?)',r.success?'success':'warn');}catch(e){toast(e.message,'error');}if(btn){btn.disabled=false;btn.innerHTML=t;}}
+async function loadDataUsage(){
+  const el=document.getElementById('sys-data-usage');if(!el)return;
+  try{
+    const d=await A.dataUsage();
+    const top=(d.folders||[]).filter(f=>f.bytes>0).slice(0,6);
+    el.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Total en <span class="mono">data/</span></span><strong style="color:var(--t0)">${d.total_human}</strong></div>${top.length?top.map(f=>`<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--t2);padding:2px 0"><span class="mono">${f.name}</span><span>${f.human} · ${f.files} arch.</span></div>`).join(''):`<div style="font-size:.72rem;color:var(--t3)">Sin datos guardados.</div>`}`;
+  }catch(e){el.innerHTML=`<div style="font-size:.72rem;color:var(--t3)">No disponible</div>`;}
+}
+function wipeAllData(){
+  confirmDlg('Vas a <b>eliminar TODOS los datos</b> del backend: capturas, handshakes, PMKID, wordlists generadas, informes, evidencias de sesiones y el mapa de recon. <b>Es irreversible.</b>',()=>{
+    confirmDlg('Última confirmación: se borrará <b>todo el contenido de la carpeta <span class="mono">data/</span></b> y se reseteará el estado en memoria. ¿Seguro?',async()=>{
+      try{const r=await A.wipeData();toast('Todos los datos han sido eliminados','success');if(ST.activeSession)setSession(null);loadDataUsage();}catch(e){toast(e.message,'error');}
+    },{ok:'Sí, borrar TODO definitivamente'});
+  },{ok:'Continuar'});
+}
 // ======== HELP / AYUDA ========
 let _helpOpen=null;
 function help(){
