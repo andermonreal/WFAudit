@@ -148,50 +148,309 @@ function goHS(bssid,essid,ch){setIP({'hs-bssid':bssid,'hs-essid':essid,'hs-ch':c
 async function qkF(bssid,essid,sec){if(!ST.activeSession){toast('Activa una sesión primero','warn');return;}if(ST.activeSession.status==='closed'){toast('La sesión activa está cerrada','warn');return;}const sv=sec==='OPEN'?'critical':sec==='WEP'?'high':sec==='WPA'?'medium':'low';const b={session_id:ST.activeSession.id,severity:sv,category:'wifi',title:sec==='OPEN'?'Red WiFi sin cifrado (OPEN)':sec==='WEP'?'Cifrado WEP obsoleto':sec==='WPA'?'WPA v1 obsoleto':'Seguridad WiFi — '+(essid||bssid),description:sec==='OPEN'?`La red "${essid}" (${bssid}) opera sin cifrado. El tráfico puede ser interceptado.`:`Red "${essid}" (${bssid}) usa ${sec}.`,evidence:`BSSID: ${bssid}\nESSID: ${essid||'oculto'}\nSeguridad: ${sec}`,recommendation:sec==='OPEN'?'Configurar WPA3-SAE o WPA2-PSK con contraseña de mínimo 16 caracteres.':sec==='WEP'?'Migrar a WPA2/WPA3 inmediatamente.':'Actualizar a WPA3-SAE si el hardware lo soporta.'};try{await A.addFinding(ST.activeSession.id,b);const u=await A.getSession(ST.activeSession.id).catch(()=>null);if(u)setSession(u);toast(`Hallazgo añadido a "${ST.activeSession.name}"`,'success');}catch(e){toast(e.message,'error');}}
 async function showOUI(mac){try{const r=await A.oui(mac);showModal('OUI / Fabricante',`<div style="padding:13px;background:var(--bg0);border-radius:8px;border:1px solid var(--b1);margin-bottom:10px"><div class="mono" style="font-size:1rem;color:var(--c);margin-bottom:7px">${r.mac}</div><div style="font-size:.84rem;margin-bottom:5px"><span style="color:var(--t2)">Fabricante:</span> <strong>${r.manufacturer||'Desconocido'}</strong></div><div style="font-size:.8rem"><span style="color:var(--t2)">OUI:</span> <span class="mono">${r.oui||'—'}</span></div></div>${r.is_randomized?`<div class="alert aw">${ic('warn')}<div>MAC aleatorizada (privacidad)</div></div>`:`<span class="badge b-g">✓ MAC estática</span>`}`,`<button class="btn btn-gh" onclick="closeModal()">Cerrar</button>`);}catch(e){toast(e.message,'error');}}
 // ======== RECON ========
+// ─── Recon (nmap / arp-scan): mapa de red persistente con escaneos en 2º plano ───
+let _recMap=null,_recPoll=null,_recOpen={};
+let _fg=null,_recGraphIds=null,_rhColor='',_recResizeBound=false;
+let _recView='grafo';try{_recView=localStorage.getItem('rec-view')||'grafo';}catch(e){}
+const REC_SCANS=[['stealth','Silencioso','Rápido y sigiloso · -sS -p-'],['full','Completo','Puertos + versiones + SO + vulnerabilidades · lento'],['udp','UDP','Top 100 puertos UDP · -sV -sC']];
+const REC_STCOL={completed:'g',running:'y',failed:'r'};
+function _recKey(ip){return ip.split('.').map(n=>('00'+n).slice(-3)).join('.');}
+function _recBusy(m){return !!(m&&(m.discovering||Object.values(m.hosts||{}).some(h=>Object.values(h.scans||{}).some(s=>s.status==='running'))));}
+
 async function recon(){
-  setC(`<div class="sup"><div class="g2" style="margin-bottom:16px"><div class="card" id="rec-form" data-pp="rec-form">
-    <div class="ctitle">${ic('search')} Escaneo nmap</div>
-    <div class="frow"><label>Objetivo * <span class="tip" data-tip="IP única (192.168.0.1), rango CIDR (192.168.0.0/24) o rango (192.168.0.1-50). Empieza con un /24 quick para descubrir hosts vivos.">?</span></label><input id="rec-tgt" class="inp" placeholder="192.168.0.0/24" data-p></div>
-    <div class="frow"><label>Tipo</label><select id="rec-type" class="inp" onchange="{const w=document.getElementById('rec-custom-wrap');if(w)w.style.display=this.value==='custom'?'block':'none';}">
-      <option value="quick">Quick — Ping sweep</option><option value="full">Full — Todos puertos + OS</option>
-      <option value="service">Service — Versiones</option><option value="vuln">Vuln — NSE vulnerabilidades</option>
-      <option value="os_detect">OS Detect — Fingerprinting</option><option value="stealth">Stealth — SYN scan</option>
-      <option value="udp">UDP — Top 100</option><option value="custom">Custom — Argumentos propios</option>
-    </select></div>
-    <div class="frow" id="rec-custom-wrap" style="display:none"><label>Argumentos nmap <span class="tip" data-tip="Tus propios flags de nmap, ej: -sS -sV -p- -T4 --script vuln. El objetivo se añade automáticamente.">?</span></label><input id="rec-custom" class="inp" placeholder="-sS -sV -p- -T4"></div>
-    <div class="frow"><label>Puertos (opcional)</label><input id="rec-ports" class="inp" placeholder="22,80,443"></div>
-    <button class="btn btn-g" style="width:100%" id="rec-btn" onclick="startRecon()">${ic('play')} Iniciar</button>
-    <div style="font-size:.62rem;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 6px">Herramientas rápidas</div>
-    <div style="display:flex;gap:7px">
-      <button class="btn btn-gh btn-sm" style="flex:1" onclick="doArpSweep()">${ic('wifi',12)} ARP Sweep <span class="tip" data-tip="Descubrimiento L2 rápido: envía ARP a todo el rango (usa el Objetivo como CIDR, ej. 192.168.0.0/24). Más rápido que nmap en la LAN y no lo bloquean firewalls.">?</span></button>
-      <button class="btn btn-gh btn-sm" style="flex:1" onclick="showRouterProbe()">${ic('shield',12)} Router Probe <span class="tip" data-tip="Auditoría enfocada del gateway: puertos de administración (SSH/Telnet/HTTP/HTTPS), modelo/firmware y credenciales por defecto.">?</span></button>
+  setC(`<div class="sup">
+    <div class="card" id="rec-bar" data-pp="rec-bar" style="padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap">
+        <div class="frow" style="flex:1;min-width:190px;margin-bottom:0"><label>Objetivo <span class="tip" data-tip="Para DESCUBRIR hosts: un rango CIDR (192.168.1.0/24). Para ESCANEAR un host suelto: su IP (192.168.1.10). La herramienta (arp-scan o nmap) la elijo yo automáticamente.">?</span></label><input id="rec-tgt" class="inp" placeholder="192.168.1.0/24   ·   ó   192.168.1.10" data-p></div>
+        <button class="btn btn-g" id="rec-disc-btn" onclick="reconDiscoverUI()">${ic('search')} Descubrir hosts</button>
+        <button class="btn btn-p" onclick="reconAddIP()">${ic('plus')} Añadir IP</button>
+      </div>
+      <div id="rec-status" style="margin-top:11px"></div>
     </div>
-  </div>
-  <div class="card" id="rec-st-card">
-    <div class="ctitle">${ic('search')} Estado</div>
-    <div id="rec-empty" class="empty" style="padding:22px">${ic('search',36)}<h3>Sin escaneo activo</h3></div>
-    <div id="rec-live" style="display:none"></div>
-  </div></div>
-  <div id="rec-results"></div><div id="rec-hist"></div></div>`);
-  loadRecHist();const rt=document.getElementById('rec-type'),rw=document.getElementById('rec-custom-wrap');if(rt&&rw)rw.style.display=rt.value==='custom'?'block':'none';}
-async function loadRecHist(){try{const sc=await A.listRecon();const el=document.getElementById('rec-hist');if(!el||!sc.length)return;el.innerHTML=`<div style="font-family:'Orbitron',monospace;font-size:.68rem;color:var(--t2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">Escaneos Anteriores</div><div class="twrap"><table><thead><tr><th>Objetivo</th><th>Tipo</th><th>Comando</th><th>Hosts</th><th>Estado</th><th>Fecha</th><th></th></tr></thead><tbody>${sc.slice(0,8).map(s=>`<tr><td class="mono">${s.target}</td><td><span class="badge b-c">${s.scan_type}</span></td><td class="mono" style="font-size:.64rem;color:var(--t2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.command||''}">${s.command||'—'}</td><td><strong>${s.hosts?.length||0}</strong></td><td>${stb(s.status)}</td><td class="mono" style="font-size:.68rem;color:var(--t2)">${fd(s.started_at)}</td><td><button class="btn btn-gh btn-xs" onclick="loadRecR('${s.id}')">Ver</button></td></tr>`).join('')}</tbody></table></div>`;}catch{}}
-async function startRecon(){const t=document.getElementById('rec-tgt')?.value?.trim(),tp=document.getElementById('rec-type')?.value,p=document.getElementById('rec-ports')?.value?.trim(),ca=document.getElementById('rec-custom')?.value?.trim();if(!t){toast('Introduce objetivo','warn');return;}if(tp==='custom'&&!ca){toast('Introduce argumentos nmap','warn');return;}const btn=document.getElementById('rec-btn');if(btn)btn.disabled=true;const live=document.getElementById('rec-live'),empty=document.getElementById('rec-empty');if(empty)empty.style.display='none';if(live){live.style.display='block';live.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> nmap <strong>${tp}</strong> en <span class="mono">${t}</span>...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;}try{const r=await A.startRecon({target:t,scan_type:tp,ports:p||null,custom_args:tp==='custom'?ca:null,timeout:600});if(live)live.innerHTML=`<div class="alert as">${ic('check')}<div>Completado · ${r.hosts?.length||0} hosts</div></div>${r.command?`<div style="font-size:.7rem;color:var(--t2);margin-top:7px">${ic('terminal',11)} Comando:<div class="mono" style="color:var(--c);font-size:.67rem;margin-top:3px;padding:5px;background:var(--bg0);border-radius:4px;word-break:break-all">${r.command}</div></div>`:''}`;renderRecR(r);loadRecHist();}catch(e){toast(e.message,'error');if(live)live.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}if(btn)btn.disabled=false;}
-async function loadRecR(id){try{const r=await A.getRecon(id);renderRecR(r);}catch(e){toast(e.message,'error');}}
-async function doArpSweep(){const t=document.getElementById('rec-tgt')?.value?.trim()||'192.168.0.0/24';const live=document.getElementById('rec-live'),empty=document.getElementById('rec-empty');if(empty)empty.style.display='none';if(live){live.style.display='block';live.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--y)"><div class="spin"></div> ARP sweep en <span class="mono">${t}</span>...</div><div class="ptrack" style="margin-top:10px"><div class="pbar ind"></div></div>`;}try{const r=await A.reconDiscover(t);if(live)live.innerHTML=`<div class="alert as">${ic('check')}<div>ARP sweep completado · ${r.hosts?.length||0} hosts vivos</div></div>`;renderRecR(r);loadRecHist();}catch(e){toast(e.message,'error');if(live)live.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}}
-function showRouterProbe(){const tgt=document.getElementById('rec-tgt')?.value?.trim()||'';const ip=/^\d+\.\d+\.\d+\.\d+$/.test(tgt)?tgt:'192.168.0.1';showModal('Router Probe — Auditoría del gateway',`<div class="alert ai">${ic('info')}<div>Escanea los puertos de administración del router e identifica servicios y modelo. Comprometer el gateway suele dar control total de la red.</div></div><div class="frow"><label>IP del router / gateway</label><input id="rp-ip" class="inp" value="${ip}" placeholder="192.168.0.1"></div><div class="crow"><input type="checkbox" id="rp-creds" checked><label for="rp-creds">Comprobar credenciales por defecto (admin/admin…)</label></div><div class="crow"><input type="checkbox" id="rp-vulns" checked><label for="rp-vulns">Comprobar vulnerabilidades conocidas</label></div><div class="crow"><input type="checkbox" id="rp-brute"><label for="rp-brute">Fuerza bruta de credenciales (lento y ruidoso)</label></div><div id="rp-res" style="margin-top:10px"></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-g" onclick="doRouterProbe()">${ic('play')} Escanear</button>`);}
-async function doRouterProbe(){const ip=document.getElementById('rp-ip')?.value?.trim()||'192.168.0.1';const el=document.getElementById('rp-res');if(el)el.innerHTML=`<div style="display:flex;align-items:center;gap:7px;color:var(--y)"><div class="spin"></div> Sondeando ${ip}...</div><div class="ptrack" style="margin-top:8px"><div class="pbar ind"></div></div>`;try{const r=await A.reconRouter({target_ip:ip,check_default_creds:document.getElementById('rp-creds')?.checked,check_known_vulns:document.getElementById('rp-vulns')?.checked,brute_force:document.getElementById('rp-brute')?.checked});if(el)el.innerHTML=renderRouterProbe(r);toast(r.reachable?'Router Probe completado':'Router no responde',r.reachable?'success':'warn');}catch(e){toast(e.message,'error');if(el)el.innerHTML=`<div class="alert ae">${ic('x')}<div>${e.message}</div></div>`;}}
-function renderRouterProbe(r){if(!r||!r.reachable)return `<div class="alert aw">${ic('warn')}<div><strong>${r?.target||'El objetivo'}</strong> no responde o está filtrado.</div></div>`;const svc=[['SSH (22)',r.ssh_open,false],['Telnet (23)',r.telnet_open,true],['HTTP (80)',r.http_open,false],['HTTPS (443)',r.https_open,false]];return `<div class="alert as" style="margin-bottom:10px">${ic('check')}<div><strong>${r.target}</strong> alcanzable${r.hostname?` · ${r.hostname}`:''}</div></div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${svc.map(([l,o,danger])=>`<span class="badge ${o?(danger?'b-r':'b-g'):'b-x'}">${o?ic(danger?'warn':'check',10):''} ${l}</span>`).join('')}</div>
-  ${r.telnet_open?`<div class="alert aw" style="margin-bottom:8px">${ic('warn')}<div style="font-size:.74rem">Telnet abierto: protocolo inseguro en texto plano. Hallazgo recomendable.</div></div>`:''}
-  ${r.os_guess?`<div style="font-size:.75rem;margin-bottom:6px"><span style="color:var(--t2)">OS:</span> <span class="badge b-p">${r.os_guess}</span></div>`:''}
-  ${r.mac?`<div style="font-size:.72rem;color:var(--t2);margin-bottom:8px">MAC: <span class="mono">${r.mac}</span></div>`:''}
-  ${(r.services||[]).length?`<div style="font-size:.66rem;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Servicios detectados</div>${r.services.map(s=>`<div style="font-size:.72rem;color:var(--t1);margin-bottom:2px"><span class="mono" style="color:var(--g)">${s.port}</span> <strong>${s.name||''}</strong> ${s.product||''} ${s.version||''}</div>`).join('')}`:''}
-  ${ST.activeSession?`<button class="btn btn-gh btn-sm" style="margin-top:10px" onclick="qkRouterF('${r.target}',${r.telnet_open?1:0})">${ic('plus',11)} Crear hallazgo</button>`:''}`;}
-async function qkRouterF(ip,telnet){if(!ST.activeSession){toast('Activa una sesión primero','warn');return;}if(ST.activeSession.status==='closed'){toast('La sesión activa está cerrada','warn');return;}const b={session_id:ST.activeSession.id,severity:telnet?'high':'medium',category:'router',title:`Superficie de administración expuesta en el router ${ip}`,description:`El gateway ${ip} expone servicios de administración en la LAN.${telnet?' Telnet (23) está abierto: credenciales y sesión viajan en texto plano.':''}`,evidence:`Router Probe sobre ${ip}${telnet?'\nPuerto 23/tcp (telnet) ABIERTO':''}`,recommendation:'Restringir el acceso de administración a redes de confianza, deshabilitar Telnet en favor de SSH, cambiar credenciales por defecto y actualizar el firmware.'};try{await A.addFinding(ST.activeSession.id,b);const u=await A.getSession(ST.activeSession.id).catch(()=>null);if(u)setSession(u);toast('Hallazgo del router añadido a la sesión','success');}catch(e){toast(e.message,'error');}}
-function renderRecR(scan){
-  const el=document.getElementById('rec-results');if(!el)return;const hosts=scan.hosts||[];
-  el.innerHTML=`<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div class="ctitle" style="margin-bottom:0">${ic('search')} Hosts (${hosts.length}) · <span class="badge b-c">${scan.scan_type}</span></div>${scan.command?`<div class="mono" style="font-size:.64rem;color:var(--t2);max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${scan.command}">${ic('terminal',11)} ${scan.command}</div>`:''}</div>
-  ${!hosts.length?`<div class="empty" style="padding:22px">${ic('search',30)}<h3>Sin hosts</h3></div>`:hosts.map(h=>`<div class="hitem" id="hi-${h.ip.replace(/\./g,'_')}"><div class="hhdr" onclick="togHD('${h.ip}')"><span style="font-family:'JetBrains Mono',monospace;font-size:.9rem;color:var(--c);font-weight:600">${h.ip}</span>${h.hostname?`<span style="font-size:.76rem;color:var(--t2)">${h.hostname}</span>`:''} ${h.mac?`<span class="mono" style="font-size:.7rem;color:var(--t2)">${h.mac}</span>`:''} <span class="badge ${h.state==='up'?'b-g':'b-x'}">${h.state}</span> ${h.os_guess?`<span class="badge b-p">${h.os_guess}</span>`:''} ${h.ports?.length?`<span class="badge b-c">${h.ports.filter(p=>p.state==='open').length} open</span>`:''}<div style="margin-left:auto;display:flex;gap:5px"><button class="btn btn-gh btn-xs" onclick="event.stopPropagation();hScan('${h.ip}','service')" title="Deep scan">${ic('search',11)} Deep</button><button class="btn btn-d btn-xs" onclick="event.stopPropagation();hScan('${h.ip}','vuln')" title="Vuln scan">${ic('warn',11)} Vuln</button></div></div><div class="hdetail" id="hd-${h.ip.replace(/\./g,'_')}" style="display:none">${h.ports?.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">${h.ports.map(p=>`<span class="badge ${p.state==='open'?'b-g':'b-x'}" title="${p.service||''}">${p.port}/${p.protocol}</span>`).join('')}</div>`:''} ${h.services?.length?`<div style="margin-bottom:7px">${h.services.map(s=>`<div style="font-size:.72rem;color:var(--t2);margin-bottom:2px"><span class="mono" style="color:var(--g)">${s.port}</span> <strong>${s.name}</strong> ${s.product||''} ${s.version||''}</div>`).join('')}</div>`:''} ${h.scripts?.length?h.scripts.map(s=>`<div style="margin-bottom:6px;padding:7px;background:var(--bg0);border-radius:5px;border-left:2px solid var(--y)"><div style="font-size:.66rem;font-weight:700;color:var(--y);margin-bottom:3px">${ic('warn',10)} ${s.id}</div><pre style="font-size:.64rem;color:var(--t2);white-space:pre-wrap;max-height:200px;overflow-y:auto;line-height:1.4">${s.output}</pre></div>`).join(''):''}  <div id="hs-res-${h.ip.replace(/\./g,'_')}"></div></div></div>`).join('')}
-  </div>`;}
-function togHD(ip){const k=ip.replace(/\./g,'_'),el=document.getElementById(`hd-${k}`);if(el)el.style.display=el.style.display==='none'?'block':'none';}
-async function hScan(ip,type){const k=ip.replace(/\./g,'_'),hd=document.getElementById(`hd-${k}`),res=document.getElementById(`hs-res-${k}`);if(hd)hd.style.display='block';if(res)res.innerHTML=`<div style="display:flex;align-items:center;gap:7px;margin-top:10px;color:var(--y)"><div class="spin"></div> ${type} en ${ip}...</div><div class="ptrack" style="margin-top:5px"><div class="pbar ind"></div></div>`;try{const r=await A.startRecon({target:ip,scan_type:type,timeout:300}),h=r.hosts?.find(x=>x.ip===ip)||r.hosts?.[0];if(res)res.innerHTML=`<div style="margin-top:10px"><div style="font-size:.66rem;color:var(--t2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em">Resultado ${type} · ${fd(new Date().toISOString())}</div>${r.command?`<div class="mono" style="font-size:.64rem;color:var(--c);padding:4px 6px;background:var(--bg0);border-radius:4px;margin-bottom:7px;word-break:break-all">${ic('terminal',10)} ${r.command}</div>`:''} ${h?`${h.os_guess?`<div style="margin-bottom:5px"><span class="badge b-p">OS: ${h.os_guess}</span></div>`:''} ${(h.ports||[]).filter(p=>p.state==='open').length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${h.ports.filter(p=>p.state==='open').map(p=>`<span class="badge b-g" title="${p.service||''} ${p.version||''}">${p.port}/${p.protocol}</span>`).join('')}</div>`:''} ${(h.services||[]).length?`<div style="margin-bottom:6px">${h.services.map(s=>`<div style="font-size:.7rem;color:var(--t1);margin-bottom:2px"><span class="mono" style="color:var(--g)">${s.port}</span> <strong>${s.name}</strong> ${s.product||''} ${s.version||''}</div>`).join('')}</div>`:''} ${(h.scripts||[]).length?h.scripts.map(s=>`<div style="margin-bottom:7px;padding:7px;background:var(--bg0);border-radius:5px;border-left:3px solid var(--y)"><div style="font-size:.66rem;font-weight:700;color:var(--y);margin-bottom:3px">${ic('warn',10)} ${s.id}</div><pre style="font-size:.63rem;color:var(--t2);white-space:pre-wrap;max-height:200px;overflow-y:auto;line-height:1.4">${s.output}</pre></div>`).join(''):''}`:''}</div>`;toast(`${type} OK para ${ip}`,'success');}catch(e){toast(e.message,'error');if(res)res.innerHTML=`<div class="alert ae" style="margin-top:8px">${ic('x')}<div>${e.message}</div></div>`;}}
+    <div id="rec-views" style="display:flex;gap:6px;margin-bottom:12px">${reconViewTabs()}</div>
+    <div id="rec-map"></div>
+  </div>`);
+  await reconRefresh();
+}
+
+function reconViewTabs(){
+  return [['grafo','Grafo','search'],['resumen','Resumen','report'],['detalle','Detalle','warn']]
+    .map(([v,l,i])=>`<button class="btn ${_recView===v?'btn-p':'btn-gh'} btn-sm" onclick="setRecView('${v}')">${ic(i,12)} ${l}</button>`).join('');
+}
+function setRecView(v){
+  _recView=v;try{localStorage.setItem('rec-view',v);}catch(e){}
+  const tb=document.getElementById('rec-views');if(tb)tb.innerHTML=reconViewTabs();
+  if(v!=='grafo'&&_fg){_fg.destroy();_fg=null;_recGraphIds=null;}
+  renderReconView(_recMap||{hosts:{}});
+}
+
+async function reconRefresh(){
+  try{_recMap=await A.reconMap();}catch(e){const m=document.getElementById('rec-map');if(m)m.innerHTML=`<div class="card"><div class="alert ae" style="margin-bottom:0">${ic('x')}<div>${e.message}</div></div></div>`;return;}
+  renderReconStatus(_recMap);renderReconView(_recMap);reconEnsurePoll();
+}
+
+function reconEnsurePoll(){
+  if(_recBusy(_recMap)){if(!_recPoll)_recPoll=setInterval(reconPollTick,2500);}
+  else if(_recPoll){clearInterval(_recPoll);_recPoll=null;}
+}
+async function reconPollTick(){
+  if(!document.getElementById('rec-map')){clearInterval(_recPoll);_recPoll=null;return;}
+  try{_recMap=await A.reconMap();}catch{return;}
+  renderReconStatus(_recMap);renderReconView(_recMap);
+  if(!_recBusy(_recMap)){clearInterval(_recPoll);_recPoll=null;}
+}
+
+function renderReconStatus(map){
+  const el=document.getElementById('rec-status');if(!el)return;
+  const hosts=Object.values(map.hosts||{}),running=hosts.reduce((n,h)=>n+Object.values(h.scans||{}).filter(s=>s.status==='running').length,0);
+  const p=[`<span class="badge b-x">${ic('search',9)} ${hosts.length} host${hosts.length!==1?'s':''}</span>`];
+  if(map.discover_via)p.push(`<span style="color:var(--t2)">herramienta: <strong style="color:var(--t1)">${map.discover_via}</strong></span>`);
+  if(map.discovering)p.push(`<span style="color:var(--y);display:inline-flex;align-items:center;gap:5px"><div class="spin"></div> descubriendo…</span>`);
+  if(running)p.push(`<span style="color:var(--y);display:inline-flex;align-items:center;gap:5px"><div class="spin"></div> ${running} escaneo${running!==1?'s':''} en curso</span>`);
+  p.push(`<span style="margin-left:auto;display:flex;gap:6px">${hosts.length?`<button class="btn btn-gh btn-xs" onclick="reconRefresh()">${ic('refresh',11)} Refrescar</button><button class="btn btn-gh btn-xs" onclick="reconClearUI()">${ic('trash',11)} Vaciar</button>`:''}</span>`);
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:.74rem">${p.join('')}</div>`;
+}
+
+function recEmpty(){return `<div class="card"><div class="empty" style="padding:34px">${ic('search',38)}<h3>Mapa de red vacío</h3><p style="color:var(--t2);font-size:.8rem;max-width:440px;margin:6px auto 0">Introduce un rango (p.ej. <span class="mono">192.168.1.0/24</span>) y pulsa <strong>Descubrir hosts</strong>, o añade una IP suelta con <strong>Añadir IP</strong> para escanearla directamente.</p></div></div>`;}
+
+function renderReconView(map){
+  const el=document.getElementById('rec-map');if(!el)return;
+  if(_recView!=='grafo'&&_fg){_fg.destroy();_fg=null;_recGraphIds=null;}
+  if(_recView==='grafo')renderReconGraph(map);
+  else if(_recView==='resumen')renderReconSummary(map);
+  else renderReconDetail(map);
+}
+
+function renderReconDetail(map){
+  const el=document.getElementById('rec-map');if(!el)return;
+  const hosts=Object.values(map.hosts||{}).sort((a,b)=>_recKey(a.ip).localeCompare(_recKey(b.ip)));
+  if(!hosts.length){el.innerHTML=recEmpty();return;}
+  el.innerHTML=`<div class="card" style="padding:14px 16px"><div class="ctitle" style="margin-bottom:12px">${ic('search')} Mapa de red · vista detallada</div>${hosts.map(hostCard).join('')}</div>`;
+}
+
+function renderReconSummary(map){
+  const el=document.getElementById('rec-map');if(!el)return;
+  const hosts=Object.values(map.hosts||{}).sort((a,b)=>_recKey(a.ip).localeCompare(_recKey(b.ip)));
+  if(!hosts.length){el.innerHTML=recEmpty();return;}
+  el.innerHTML=`<div class="card"><div class="twrap"><table><thead><tr><th></th><th>IP</th><th>Etiqueta</th><th>Host / Fabricante</th><th>Abiertos</th><th>SO</th><th>Escaneos</th><th></th></tr></thead><tbody>${hosts.map(h=>{
+    const scans=h.scans||{},openN=new Set();let os=null;
+    Object.values(scans).forEach(s=>{(s.ports||[]).forEach(p=>{if(p.state==='open')openN.add(p.port);});if(s.os&&!os)os=s.os;});
+    const dot=h.color?`<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${h.color};box-shadow:0 0 0 2px var(--bg2)"></span>`:'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;border:1px solid var(--b1)"></span>';
+    const st=REC_SCANS.filter(([t])=>scans[t]).map(([t,l])=>`<span class="badge b-${REC_STCOL[scans[t].status]||'x'}" style="font-size:.55rem" title="${l}">${l[0]}</span>`).join(' ');
+    return `<tr style="cursor:pointer" onclick="reconHostModal('${h.ip}')"><td>${dot}</td><td class="mono" style="color:var(--c);font-weight:600">${h.ip}</td><td>${h.label?`<strong>${h.label}</strong>`:'<span style="color:var(--t3)">—</span>'}</td><td style="font-size:.74rem;color:var(--t2)">${h.hostname||h.vendor||'—'}</td><td>${openN.size?`<span class="badge b-g">${openN.size}</span>`:'<span style="color:var(--t3)">—</span>'}</td><td style="font-size:.7rem;color:var(--t2)">${os?(os.length>22?os.slice(0,22)+'…':os):'—'}</td><td>${st||'<span style="color:var(--t3)">—</span>'}</td><td><button class="btn btn-gh btn-xs" onclick="event.stopPropagation();reconHostModal('${h.ip}')">Abrir</button></td></tr>`;
+  }).join('')}</tbody></table></div></div>`;
+}
+
+function reconGateway(map){
+  const hosts=Object.keys(map.hosts||{});if(!hosts.length)return null;
+  if(map.gateway&&map.hosts[map.gateway])return map.gateway;
+  const one=hosts.find(ip=>/\.1$/.test(ip));if(one)return one;
+  return hosts.slice().sort((a,b)=>_recKey(a).localeCompare(_recKey(b)))[0];
+}
+
+function reconGraphData(map){
+  const hosts=Object.values(map.hosts||{}),gw=reconGateway(map);
+  const sats=hosts.filter(h=>h.ip!==gw);
+  const cx=480,cy=340,R=120+sats.length*9;          // anillo alrededor del gateway
+  const nodes=hosts.map(h=>{
+    const scans=h.scans||{},openN=new Set();let running=false;
+    Object.values(scans).forEach(s=>{(s.ports||[]).forEach(p=>{if(p.state==='open')openN.add(p.port);});if(s.status==='running')running=true;});
+    const isGw=h.ip===gw;
+    const n={id:h.ip,label:h.label||h.ip,color:h.color||(isGw?'#ff9f43':'#54a0ff'),
+      r:(isGw?17:11)+Math.min(13,openN.size*1.7),running,hub:isGw};
+    if(h.x!=null&&h.y!=null){n.x=h.x;n.y=h.y;n.pin=true;}                       // guardado → fijado
+    else if(isGw){n.x=cx;n.y=cy;n.center=true;}                                // gateway anclado al centro
+    else{const i=sats.indexOf(h),a=(i/Math.max(1,sats.length))*2*Math.PI;n.x=cx+R*Math.cos(a);n.y=cy+R*Math.sin(a);}
+    return n;
+  });
+  return {nodes,links:sats.map(h=>({source:gw,target:h.ip})),gw};
+}
+
+function reconSizeGraph(){
+  const svg=document.getElementById('rec-svg');if(!svg)return;
+  const top=svg.getBoundingClientRect().top;
+  const lg=document.getElementById('rec-legend'),lh=lg?lg.getBoundingClientRect().height:0;
+  svg.style.height=Math.max(340,Math.round(window.innerHeight-top-lh-40))+'px';
+}
+
+function renderReconLegend(map){
+  const el=document.getElementById('rec-legend');if(!el)return;
+  const entries=Object.entries(map.legend||{}).filter(([c,l])=>l&&(''+l).trim());
+  el.innerHTML=entries.length
+    ?entries.map(([c,l])=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:.7rem;color:var(--t1)"><span style="width:12px;height:12px;border-radius:50%;background:${c};box-shadow:0 0 0 2px var(--bg2)"></span>${l}</span>`).join('')
+      +`<button class="btn btn-gh btn-xs" style="margin-left:auto" onclick="reconLegendModal()">${ic('edit',10)} Editar</button>`
+    :`<span style="font-size:.66rem;color:var(--t3)">Sin leyenda — pulsa <strong>Leyenda</strong> para dar significado a los colores (p.ej. rojo = comprometido).</span>`;
+}
+
+function renderReconGraph(map){
+  const el=document.getElementById('rec-map');if(!el)return;
+  const hosts=Object.values(map.hosts||{});
+  if(!hosts.length){if(_fg){_fg.destroy();_fg=null;_recGraphIds=null;}el.innerHTML=recEmpty();return;}
+  if(!document.getElementById('rec-svg')){
+    el.innerHTML=`<div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--b0);flex-wrap:wrap">
+        <div class="ctitle" style="margin-bottom:0">${ic('search')} Grafo de red</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:.64rem;color:var(--t2)">arrastra · rueda: zoom · clic: detalles · doble-clic: soltar</span><button class="btn btn-gh btn-xs" onclick="reconLegendModal()">${ic('info',10)} Leyenda</button><button class="btn btn-gh btn-xs" onclick="_fg&&_fg.fit()">${ic('search',10)} Encajar</button></div>
+      </div>
+      <svg id="rec-svg" style="width:100%;display:block;background:radial-gradient(circle at 50% 42%,var(--bg2),var(--bg0));cursor:grab;touch-action:none"></svg>
+      <div id="rec-legend" style="padding:8px 14px;border-top:1px solid var(--b0);display:flex;gap:14px;flex-wrap:wrap;align-items:center"></div>
+    </div>`;
+    _fg=new ForceGraph(document.getElementById('rec-svg'));
+    _fg.on('nodeClick',id=>reconHostModal(id));
+    _fg.on('nodeMove',(id,x,y)=>A.reconUpdateHost(id,{x,y}).catch(()=>{}));
+    _recGraphIds=null;
+    if(!_recResizeBound){_recResizeBound=true;window.addEventListener('resize',reconSizeGraph);}
+  }
+  renderReconLegend(map);reconSizeGraph();
+  const {nodes,links}=reconGraphData(map);
+  const ids=nodes.map(n=>n.id).sort().join(',');
+  if(ids!==_recGraphIds){_fg.setData(nodes,links);_recGraphIds=ids;setTimeout(()=>{if(_fg){reconSizeGraph();_fg.fit();}},480);}
+  else _fg.update(nodes);
+}
+
+function reconLegendModal(){
+  const lg=(_recMap&&_recMap.legend)||{};
+  const body=`<div style="font-size:.78rem;color:var(--t2);margin-bottom:12px">Asigna un significado a cada color. Los que dejes en blanco no salen en la leyenda. Luego colorea cada host desde su ficha.</div>
+    ${REC_PALETTE.map(c=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:22px;height:22px;border-radius:50%;background:${c};flex-shrink:0;box-shadow:0 0 0 2px var(--bg2)"></span><input class="inp lg-in" data-c="${c}" value="${(lg[c]||'').replace(/"/g,'&quot;')}" placeholder="p.ej. Comprometido, Objetivo, IoT, servidor..." data-nopersist></div>`).join('')}`;
+  showModal('Leyenda de colores',body,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn btn-g" onclick="reconSaveLegend()">${ic('check')} Guardar</button>`,true);
+}
+async function reconSaveLegend(){
+  const lg={};document.querySelectorAll('.lg-in').forEach(i=>{const v=(i.value||'').trim();if(v)lg[i.dataset.c]=v;});
+  try{await A.reconSetLegend(lg);if(_recMap)_recMap.legend=lg;closeModal();renderReconLegend(_recMap);toast('Leyenda guardada','success');}
+  catch(e){toast(e.message,'error');}
+}
+
+function hostCard(h){
+  const open=_recOpen[h.ip],scans=h.scans||{},openPorts=new Set();let os=null;
+  Object.values(scans).forEach(s=>{(s.ports||[]).forEach(x=>{if(x.state==='open')openPorts.add(x.port+'/'+x.protocol);});if(s.os&&!os)os=s.os;});
+  const badges=REC_SCANS.filter(([t])=>scans[t]).map(([t,l])=>{const s=scans[t],c=REC_STCOL[s.status]||'x';return `<span class="badge b-${c}" style="font-size:.6rem" title="${l}: ${s.status}">${s.status==='running'?'◍':s.status==='completed'?'✓':'✗'} ${l}</span>`;}).join('');
+  const btns=REC_SCANS.map(([t,l,tip])=>{const r=scans[t]&&scans[t].status==='running';return `<button class="btn btn-gh btn-xs" ${r?'disabled':''} title="${tip}" onclick="event.stopPropagation();reconScanUI('${h.ip}','${t}')">${r?'<div class="spin"></div>':ic('play',10)} ${l}</button>`;}).join('');
+  return `<div class="hitem"><div class="hhdr" onclick="recToggle('${h.ip}')">
+    <span style="color:var(--t2);display:inline-block;transition:transform .2s;${open?'transform:rotate(90deg)':''}">▸</span>
+    <span class="mono" style="font-size:.9rem;color:var(--c);font-weight:600">${h.ip}</span>
+    ${h.hostname?`<span style="font-size:.74rem;color:var(--t2)">${h.hostname}</span>`:''}
+    ${h.vendor?`<span class="badge b-x" style="font-size:.58rem">${h.vendor}</span>`:''}
+    ${openPorts.size?`<span class="badge b-g">${openPorts.size} abierto${openPorts.size!==1?'s':''}</span>`:''}
+    ${os?`<span class="badge b-p" style="font-size:.58rem" title="${os}">SO: ${os.length>20?os.slice(0,20)+'…':os}</span>`:''}
+    ${badges}
+    <span style="display:flex;gap:4px;margin-left:auto;flex-wrap:wrap" onclick="event.stopPropagation()">
+      ${btns}
+      <button class="btn btn-gh btn-xs" title="Volcar los puertos/vulns de este host como hallazgo a la sesión activa" onclick="reconHostFinding('${h.ip}')">${ic('plus',10)} Sesión</button>
+      <button class="btn btn-d btn-xs btn-ico" title="Quitar del mapa" onclick="reconDelHostUI('${h.ip}')">${ic('trash',11)}</button>
+    </span>
+  </div>${open?`<div class="hdetail">${hostDetail(h)}</div>`:''}</div>`;
+}
+
+function hostDetail(h){
+  const scans=h.scans||{},done=REC_SCANS.filter(([t])=>scans[t]);
+  if(!done.length)return `<div style="color:var(--t2);font-size:.78rem">Sin escaneos todavía. Usa <strong>Silencioso</strong>, <strong>Completo</strong> o <strong>UDP</strong> — los resultados se irán acumulando aquí, uno debajo de otro.</div>`;
+  return done.map(([t])=>scanResultHTML(scans[t])).join('');
+}
+
+function scanResultHTML(s){
+  const openPorts=(s.ports||[]).filter(p=>p.state==='open'),scripts=[];
+  (s.ports||[]).forEach(p=>Object.entries(p.scripts||{}).forEach(([id,out])=>scripts.push({port:p.port,proto:p.protocol,id,out})));
+  let inner='';
+  if(s.status==='running')inner=`<div style="display:flex;align-items:center;gap:8px;color:var(--y);font-size:.8rem"><div class="spin"></div> escaneando…</div><div class="ptrack" style="margin-top:7px"><div class="pbar ind"></div></div>`;
+  else if(s.status==='failed')inner=`<div class="alert ae" style="margin-bottom:0">${ic('x')}<div>${s.error||'Falló el escaneo'}</div></div>`;
+  else{
+    inner=openPorts.length?`<div class="twrap"><table><thead><tr><th>Puerto</th><th>Servicio</th><th>Versión</th></tr></thead><tbody>${openPorts.map(p=>`<tr><td><span class="badge b-g mono">${p.port}/${p.protocol}</span></td><td><strong>${p.service||'—'}</strong></td><td style="font-size:.72rem;color:var(--t2)">${[p.product,p.version,p.extra].filter(Boolean).join(' ')||'—'}</td></tr>`).join('')}</tbody></table></div>`:`<div style="color:var(--t2);font-size:.76rem">Sin puertos abiertos detectados.</div>`;
+    if(s.os)inner+=`<div style="margin-top:8px;font-size:.76rem"><span style="color:var(--t2)">Sistema operativo:</span> <span class="badge b-p">${s.os}</span></div>`;
+    if(scripts.length)inner+=`<div style="margin-top:10px"><div style="font-size:.62rem;color:var(--y);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">${ic('warn',10)} Vulnerabilidades (NSE)</div>${scripts.map(sc=>`<div style="margin-bottom:6px;padding:7px;background:var(--bg0);border-radius:5px;border-left:3px solid var(--y)"><div style="font-size:.66rem;font-weight:700;color:var(--y);margin-bottom:3px">${sc.port}/${sc.proto} · ${sc.id}</div><pre style="font-size:.62rem;color:var(--t2);white-space:pre-wrap;max-height:220px;overflow-y:auto;line-height:1.45;margin:0">${(sc.out||'').replace(/</g,'&lt;')}</pre></div>`).join('')}</div>`;
+  }
+  const col=REC_STCOL[s.status]||'x';
+  return `<div style="margin-bottom:11px;border:1px solid var(--b0);border-radius:8px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 11px;background:var(--bg3);flex-wrap:wrap">
+      <span class="badge b-${col}">${s.label||s.type}</span>
+      ${s.status==='completed'?`<span class="badge b-x" style="font-size:.58rem">${openPorts.length} abierto${openPorts.length!==1?'s':''}</span>`:''}
+      ${s.finished_at?`<span style="font-size:.66rem;color:var(--t2)">${fd(s.finished_at)}</span>`:''}
+      ${s.command?`<span class="mono" style="font-size:.6rem;color:var(--t3);margin-left:auto;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.command}">${s.command}</span>`:''}
+    </div>
+    <div style="padding:10px 11px">${inner}</div>
+  </div>`;
+}
+
+function recToggle(ip){_recOpen[ip]=!_recOpen[ip];renderReconView(_recMap);}
+
+async function reconDiscoverUI(){
+  const t=(document.getElementById('rec-tgt')?.value||'').trim();
+  if(!t){toast('Introduce un rango CIDR (p.ej. 192.168.1.0/24)','warn');return;}
+  const btn=document.getElementById('rec-disc-btn');if(btn)btn.disabled=true;
+  try{_recMap=await A.reconDiscover(t);renderReconStatus(_recMap);renderReconView(_recMap);reconEnsurePoll();}
+  catch(e){toast(e.message,'error');}
+  if(btn)btn.disabled=false;
+}
+
+async function reconAddIP(){
+  const ip=(document.getElementById('rec-tgt')?.value||'').trim();
+  if(!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)){toast('Introduce una IP válida (p.ej. 192.168.1.10)','warn');return;}
+  try{await A.reconAddHost(ip);_recOpen[ip]=true;await reconRefresh();toast(`${ip} añadido al mapa`,'success');}
+  catch(e){toast(e.message,'error');}
+}
+
+async function reconScanUI(ip,type){
+  try{await A.reconScan(ip,type);_recOpen[ip]=true;await reconRefresh();toast(`Escaneo lanzado en ${ip}`,'success');}
+  catch(e){toast(e.message,'error');}
+}
+
+async function reconDelHostUI(ip){
+  confirmDlg(`¿Quitar <b>${ip}</b> del mapa? Se pierden sus escaneos.`,async()=>{try{await A.reconDelHost(ip);delete _recOpen[ip];await reconRefresh();}catch(e){toast(e.message,'error');}});
+}
+
+async function reconClearUI(){
+  confirmDlg('¿Vaciar todo el mapa de red? Se borran todos los hosts y sus escaneos.',async()=>{try{await A.reconClear();_recOpen={};await reconRefresh();toast('Mapa vaciado','success');}catch(e){toast(e.message,'error');}});
+}
+
+const REC_PALETTE=['#ff5c5c','#ff9f43','#feca57','#1dd1a1','#54a0ff','#5f27cd','#ee5253','#c8d6e5'];
+function reconHostModal(ip){
+  const h=(_recMap&&_recMap.hosts||{})[ip];if(!h)return;
+  const scans=h.scans||{};_rhColor=h.color||'';
+  const meta=[h.hostname,h.vendor,h.mac].filter(Boolean).join(' · ')||'Sin metadatos';
+  const body=`
+    <div style="margin-bottom:14px">
+      <div class="mono" style="font-size:1.15rem;color:var(--c);font-weight:700">${h.ip}</div>
+      <div style="font-size:.76rem;color:var(--t2);margin-top:3px">${meta}</div>
+      <div style="font-size:.68rem;color:var(--t3);margin-top:2px">Descubierto por ${h.discovered_via||'—'}</div>
+    </div>
+    <div class="fgrid">
+      <div class="frow"><label>Etiqueta / título</label><input id="rh-label" class="inp" value="${(h.label||'').replace(/"/g,'&quot;')}" placeholder="p.ej. Router, TV del salón..." data-nopersist></div>
+      <div class="frow"><label>Color del nodo</label><div id="rh-pal" style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px">${REC_PALETTE.map(c=>`<span class="rh-sw" data-c="${c}" onclick="reconPickColor('${c}')" style="width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${h.color===c?'var(--t0)':'transparent'}"></span>`).join('')}<span class="rh-sw" data-c="" onclick="reconPickColor('')" title="Por defecto" style="width:24px;height:24px;border-radius:50%;background:var(--bg4);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--t2);border:2px solid ${!h.color?'var(--t0)':'var(--b1)'}">×</span></div></div>
+    </div>
+    <div class="frow"><label>Notas</label><textarea id="rh-notes" class="inp" style="min-height:70px" placeholder="Notas libres sobre esta máquina..." data-nopersist>${h.notes||''}</textarea></div>
+    <div style="display:flex;gap:7px;margin:8px 0 4px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:.72rem;color:var(--t2)">Escanear puertos:</span>
+      ${REC_SCANS.map(([t,l,tip])=>{const r=scans[t]&&scans[t].status==='running';return `<button class="btn btn-gh btn-sm" ${r?'disabled':''} title="${tip}" onclick="reconScanUI('${ip}','${t}')">${r?'<div class="spin"></div>':ic('play',11)} ${l}</button>`;}).join('')}
+      <button class="btn btn-gh btn-sm" onclick="reconHostFinding('${ip}')">${ic('plus',11)} A sesión</button>
+    </div>
+    <div id="rh-detail" style="border-top:1px solid var(--b0);margin-top:12px;padding-top:12px">${hostDetail(h)}</div>`;
+  showModal(h.label?`${h.label} · ${h.ip}`:h.ip,body,
+    `<button class="btn btn-gh btn-d" onclick="reconDelHostUI('${ip}')">${ic('trash')} Quitar</button><button class="btn btn-gh" onclick="closeModal()">Cerrar</button><button class="btn btn-g" onclick="reconSaveHost('${ip}')">${ic('check')} Guardar</button>`,true);
+}
+function reconPickColor(c){_rhColor=c;document.querySelectorAll('#rh-pal .rh-sw').forEach(sw=>{const own=sw.dataset.c||'';sw.style.border='2px solid '+(own===c?'var(--t0)':(own?'transparent':'var(--b1)'));});}
+async function reconSaveHost(ip){
+  const label=(document.getElementById('rh-label')?.value||'').trim();
+  const notes=(document.getElementById('rh-notes')?.value||'');
+  try{
+    await A.reconUpdateHost(ip,{label,notes,color:_rhColor||''});
+    const u=await A.reconMap().catch(()=>null);if(u)_recMap=u;
+    closeModal();renderReconStatus(_recMap);renderReconView(_recMap);toast('Host actualizado','success');
+  }catch(e){toast(e.message,'error');}
+}
+
+async function reconHostFinding(ip){
+  if(!ST.activeSession){toast('Activa una sesión primero','warn');return;}
+  if(ST.activeSession.status==='closed'){toast('La sesión activa está cerrada','warn');return;}
+  const h=(_recMap&&_recMap.hosts||{})[ip];if(!h){toast('Host no encontrado','warn');return;}
+  const openPorts=[],scripts=[];let os=null;
+  Object.values(h.scans||{}).forEach(s=>{if(s.os&&!os)os=s.os;(s.ports||[]).forEach(p=>{if(p.state==='open')openPorts.push(p);Object.entries(p.scripts||{}).forEach(([id,out])=>scripts.push(`${p.port}/${p.protocol} ${id}:\n${out}`));});});
+  if(!openPorts.length){toast('Escanea puertos primero: este host no tiene resultados','warn');return;}
+  const lines=openPorts.map(p=>`${p.port}/${p.protocol}  ${p.service||''}  ${[p.product,p.version].filter(Boolean).join(' ')}`.trim()).join('\n');
+  const hasVuln=scripts.length>0;
+  const b={session_id:ST.activeSession.id,severity:hasVuln?'high':'medium',category:'network',
+    title:`Servicios expuestos en ${ip}${h.hostname?' ('+h.hostname+')':''}`,
+    description:`El host ${ip}${h.hostname?' ('+h.hostname+')':''}${os?', '+os+',':''} expone ${openPorts.length} puerto(s) en la red.${hasVuln?' El análisis NSE de vulnerabilidades reportó hallazgos (ver evidencia).':''}`,
+    evidence:`Puertos abiertos:\n${lines}${hasVuln?'\n\n--- NSE vuln ---\n'+scripts.join('\n\n'):''}`,
+    recommendation:'Revisar la exposición de cada servicio, cerrar o segmentar los puertos innecesarios, parchear los servicios vulnerables y restringir el acceso por firewall a redes de confianza.'};
+  try{await A.addFinding(ST.activeSession.id,b);const u=await A.getSession(ST.activeSession.id).catch(()=>null);if(u)setSession(u);toast('Hallazgo añadido a la sesión','success');}
+  catch(e){toast(e.message,'error');}
+}

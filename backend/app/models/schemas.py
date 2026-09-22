@@ -308,6 +308,29 @@ class RouterProbeRequest(BaseModel):
     credential_list: Optional[str] = None
 
 
+# ── Recon: mapa de red persistente ──
+
+class DiscoverRequest(BaseModel):
+    cidr: str
+
+class ReconScanRequest(BaseModel):
+    ip: str
+    scan_type: str  # stealth | full | udp
+
+class AddHostRequest(BaseModel):
+    ip: str
+
+class HostUpdateRequest(BaseModel):
+    label: Optional[str] = None
+    notes: Optional[str] = None
+    color: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+class LegendRequest(BaseModel):
+    legend: dict = {}   # color (hex) -> significado
+
+
 # ── Capture Management ──
 
 class CaptureFile(BaseModel):

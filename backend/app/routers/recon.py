@@ -1,35 +1,69 @@
 from fastapi import APIRouter, HTTPException
-from app.models.schemas import NmapTarget, RouterProbeRequest
-from app.services.nmap_service import nmap_service
+from app.models.schemas import (
+    DiscoverRequest, ReconScanRequest, AddHostRequest, HostUpdateRequest, LegendRequest,
+)
+from app.services.recon_service import recon_service
 
 router = APIRouter(prefix="/recon", tags=["Reconnaissance"])
 
-@router.post("/scan")
-async def nmap_scan(target: NmapTarget):
-    return await nmap_service.scan(target)
+
+@router.get("/map")
+async def get_map():
+    """Mapa de red persistente (hosts + escaneos de puertos acumulados)."""
+    return recon_service.get_map()
+
 
 @router.post("/discover")
-async def discover_network(cidr: str = "192.168.0.0/24"):
-    return await nmap_service.discover_network(cidr)
+async def discover(req: DiscoverRequest):
+    """Descubre hosts activos en un CIDR (arp-scan en LAN, nmap -sn si no).
 
-@router.post("/deep/{ip}")
-async def deep_scan(ip: str):
-    return await nmap_service.deep_scan_host(ip)
+    Corre en segundo plano: devuelve el mapa con discovering=true y hay que
+    consultar /recon/map para ver el progreso.
+    """
+    r = recon_service.discover(req.cidr)
+    if isinstance(r, dict) and r.get("error"):
+        raise HTTPException(400, r["error"])
+    return r
 
-@router.post("/vuln/{ip}")
-async def vulnerability_scan(ip: str):
-    return await nmap_service.vuln_scan(ip)
 
-@router.post("/router")
-async def probe_router(req: RouterProbeRequest = None):
-    return await nmap_service.probe_router(req.target_ip if req else "192.168.0.1")
+@router.post("/scan")
+async def scan(req: ReconScanRequest):
+    """Lanza un escaneo de puertos en segundo plano sobre un host del mapa."""
+    r = recon_service.scan_host(req.ip, req.scan_type)
+    if isinstance(r, dict) and r.get("error"):
+        raise HTTPException(400, r["error"])
+    return r
 
-@router.get("/scans")
-async def list_scans():
-    return nmap_service.list_scans()
 
-@router.get("/scans/{scan_id}")
-async def get_scan(scan_id: str):
-    s = nmap_service.get_scan(scan_id)
-    if not s: raise HTTPException(404, "Scan not found")
-    return s
+@router.post("/host")
+async def add_host(req: AddHostRequest):
+    """Añade manualmente una IP al mapa (para escanear un host escrito a mano)."""
+    r = recon_service.add_host(req.ip)
+    if isinstance(r, dict) and r.get("error"):
+        raise HTTPException(400, r["error"])
+    return r
+
+
+@router.patch("/host/{ip}")
+async def update_host(ip: str, req: HostUpdateRequest):
+    """Edita etiqueta/notas/color/posición de un host."""
+    r = recon_service.update_host(ip, req.model_dump(exclude_none=True))
+    if isinstance(r, dict) and r.get("error"):
+        raise HTTPException(404, r["error"])
+    return r
+
+
+@router.delete("/host/{ip}")
+async def remove_host(ip: str):
+    return recon_service.remove_host(ip)
+
+
+@router.put("/legend")
+async def set_legend(req: LegendRequest):
+    """Guarda la leyenda de colores del grafo (color → significado)."""
+    return recon_service.update_legend(req.legend)
+
+
+@router.delete("/map")
+async def clear_map():
+    return recon_service.clear_map()

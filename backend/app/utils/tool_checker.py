@@ -18,6 +18,7 @@ REQUIRED_TOOLS = {
     "aireplay-ng": {"package": "aircrack-ng", "critical": True, "category": "wifi"},
     "aircrack-ng": {"package": "aircrack-ng", "critical": True, "category": "wifi"},
     "nmap": {"package": "nmap", "critical": True, "category": "recon"},
+    "arp-scan": {"package": "arp-scan", "critical": False, "category": "recon"},
     "iwconfig": {"package": "wireless-tools", "critical": True, "category": "wifi"},
     "iw": {"package": "iw", "critical": False, "category": "wifi"},
     "ip": {"package": "iproute2", "critical": False, "category": "system"},

@@ -221,7 +221,7 @@ cmd_install() {
         # Core auditoría WiFi
         aircrack-ng hcxdumptool hcxtools hashcat
         # Red
-        nmap tcpdump tshark
+        nmap arp-scan tcpdump tshark
         # Ataques
         hostapd dnsmasq macchanger dsniff arping mitmproxy
         # Utilidades de sistema
@@ -478,7 +478,7 @@ cmd_logs() {
 cmd_preflight() {
     step "Verificación de herramientas del sistema"
     local tools=(aircrack-ng airodump-ng aireplay-ng airmon-ng \
-                 hcxdumptool hcxpcapngtool hashcat nmap hostapd dnsmasq \
+                 hcxdumptool hcxpcapngtool hashcat nmap arp-scan hostapd dnsmasq \
                  macchanger arpspoof mitmdump tshark tcpdump iptables iw)
     local missing=()
     for t in "${tools[@]}"; do
