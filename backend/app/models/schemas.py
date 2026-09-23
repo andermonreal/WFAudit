@@ -285,6 +285,20 @@ class Wpa3AttackRequest(BaseModel):
     timeout: int = 120
 
 
+# ── WPS Attack (reaver / bully) ──
+
+class WpsAttackRequest(BaseModel):
+    interface: str
+    target_bssid: str
+    target_essid: Optional[str] = None
+    channel: Optional[int] = None
+    attack_type: str = "pixie"   # pixie | bruteforce
+    tool: str = "reaver"         # reaver | bully
+    pin: Optional[str] = None    # PIN conocido (opcional)
+    no_lock: bool = False        # reaver -L: ignora el lockout del AP
+    delay: Optional[int] = None  # reaver -d: retardo entre intentos (s)
+
+
 # ── MITM ──
 
 class MitmRequest(BaseModel):

@@ -24,18 +24,19 @@ Backend API construido con **FastAPI (Python 3.11+)** que orquesta las herramien
 12. [Módulo: Evil Twin](#12-módulo-evil-twin--punto-de-acceso-falso)
 13. [Módulo: Enterprise](#13-módulo-enterprise--ataque-a-wpa2-enterprise)
 14. [Módulo: WPA3](#14-módulo-wpa3--ataques-al-estándar-más-reciente)
-15. [Módulo: Recon](#15-módulo-recon--reconocimiento-con-nmap)
-16. [Módulo: MITM](#16-módulo-mitm--man-in-the-middle-avanzado)
-17. [Módulo: Captures](#17-módulo-captures--gestión-de-archivos)
-18. [Módulo: Sessions](#18-módulo-sessions--documentación-de-auditoría)
-19. [Flujo de trabajo completo](#19-flujo-de-trabajo-completo-paso-a-paso)
-20. [Referencia completa de endpoints](#20-referencia-completa-de-endpoints)
-21. [Modelos de datos (schemas)](#21-modelos-de-datos-schemas)
-22. [Configuración avanzada](#22-configuración-avanzada)
-23. [Troubleshooting detallado](#23-troubleshooting-detallado)
-24. [Preguntas frecuentes (FAQ)](#24-preguntas-frecuentes-faq)
-25. [Glosario técnico](#25-glosario-técnico)
-26. [Bibliografía y referencias](#26-bibliografía-y-referencias)
+15. [Módulo: WPS](#15-módulo-wps--pixie-dust-y-fuerza-bruta-de-pin)
+16. [Módulo: Recon](#16-módulo-recon--reconocimiento-con-nmap)
+17. [Módulo: MITM](#17-módulo-mitm--man-in-the-middle-avanzado)
+18. [Módulo: Captures](#18-módulo-captures--gestión-de-archivos)
+19. [Módulo: Sessions](#19-módulo-sessions--documentación-de-auditoría)
+20. [Flujo de trabajo completo](#20-flujo-de-trabajo-completo-paso-a-paso)
+21. [Referencia completa de endpoints](#21-referencia-completa-de-endpoints)
+22. [Modelos de datos (schemas)](#22-modelos-de-datos-schemas)
+23. [Configuración avanzada](#23-configuración-avanzada)
+24. [Troubleshooting detallado](#24-troubleshooting-detallado)
+25. [Preguntas frecuentes (FAQ)](#25-preguntas-frecuentes-faq)
+26. [Glosario técnico](#26-glosario-técnico)
+27. [Bibliografía y referencias](#27-bibliografía-y-referencias)
 
 ---
 
@@ -51,11 +52,11 @@ En lugar de ejecutar manualmente una decena de comandos diferentes en la termina
 
 | Métrica | Valor |
 |---|---|
-| Líneas de código Python | ~3.000 |
-| Archivos fuente | 36 |
-| Endpoints HTTP | 62 |
-| Servicios (capa de negocio) | 11 |
-| Routers (capa HTTP) | 8 |
+| Líneas de código Python | ~3.200 |
+| Archivos fuente | 37 |
+| Endpoints HTTP | ~77 |
+| Servicios (capa de negocio) | 13 |
+| Routers (capa HTTP) | 9 |
 | Utilidades compartidas | 6 |
 | Schemas Pydantic | 50+ |
 | Herramientas del sistema integradas | 30+ |
@@ -86,6 +87,11 @@ En lugar de ejecutar manualmente una decena de comandos diferentes en la termina
 - Explotación de downgrade WPA3 → WPA2
 - DoS contra SAE (Dragonfly handshake)
 
+**Ataques a WPS:**
+- Pixie-Dust (offline) contra chipsets con nonces débiles (reaver `-K` / bully `-d`)
+- Fuerza bruta del PIN WPS (~11.000 intentos) con detección de lockout
+- Recuperación de la PSK WPA a partir del PIN; lanzamiento directo desde el escáner
+
 **Ataques de capa red:**
 - Evil Twin con portal cautivo, forwarding de internet y deauth integrado
 - MITM con ARP spoofing bidireccional + mitmproxy
@@ -94,15 +100,24 @@ En lugar de ejecutar manualmente una decena de comandos diferentes en la termina
 - Real-time flow viewer con filtros por host/método/credenciales
 
 **Reconocimiento interno (post-acceso):**
-- Nmap con 8 perfiles (quick, full, vuln, service, os_detect, stealth, UDP, custom)
-- Router probe (CTF) con puertos configurables
+- Nmap con 3 perfiles por host: Silencioso (`-sS -p-`), Completo (puertos + versiones + SO + vuln NSE) y UDP
+- Descubrimiento de hosts (ARP/ping) y mapa de red interactivo con leyenda de colores editable
+- Router probe con puertos configurables
 - Detección de OS, servicios, versiones y vulnerabilidades
 
+**Generación de diccionarios:**
+- Generador de wordlists a medida desde semillas: leetspeak, mayúsculas/minúsculas, años (1900–2050), símbolos, combinaciones y patrón semilla+año+símbolo (`cuchara2023!`)
+- +450 nombres españoles, top-N contraseñas comunes y estimación exacta antes de generar
+- Importación de diccionarios de SecLists (rockyou, xato-net) con un clic
+
 **Gestión y reporting:**
-- Sesiones de auditoría con hallazgos categorizados por severidad
+- Sesiones de auditoría con hallazgos categorizados por severidad y evidencia gráfica
 - Gestión centralizada de archivos de captura (.cap, .pcap, .pcapng, .22000, .csv, .jsonl)
-- Exportación de informes estructurados en JSON
-- Gestión de subprocesos con cancelación en caliente
+- Exportación de informes en **PDF** y JSON estructurado
+- Gestión de subprocesos con cancelación en caliente y notificaciones al terminar
+
+**Seguridad de la plataforma:**
+- Bind a `127.0.0.1` por defecto; exposición en LAN opcional protegida por token (Bearer / X-API-Key / query param)
 
 ---
 
@@ -521,21 +536,28 @@ Si `/system/preflight` reporta herramientas faltantes, instálalas antes de cont
 
 ### 4.4. Variables de entorno (`config.py`)
 
-El backend usa `pydantic-settings` para gestionar configuración. Las variables se pueden sobrescribir vía entorno o archivo `.env`:
+Hay **dos niveles** de configuración:
+
+**1. Variables del script `wfaudit`** (la forma recomendada de arrancar):
 
 ```bash
-# Host/puerto
-WFAUDIT_HOST=0.0.0.0
-WFAUDIT_PORT=8000
+WFAUDIT_TOKEN=secreto        # si se define → bind 0.0.0.0 (LAN) + auth por token obligatoria
+WFAUDIT_HOST=127.0.0.1       # fuerza el host del backend (default: 127.0.0.1, o 0.0.0.0 con token)
+WFAUDIT_FRONTEND_HOST=...    # host de la interfaz web (default: igual que el backend)
+WFAUDIT_PORT=8000            # puerto del backend
+WFAUDIT_FRONTEND_PORT=8080   # puerto de la interfaz web
+```
 
-# Directorios de trabajo
-WFAUDIT_CAPTURES_DIR=/var/wfaudit/captures
-WFAUDIT_LOGS_DIR=/var/wfaudit/logs
-WFAUDIT_WORDLISTS_DIR=/usr/share/wordlists
+Seguro por defecto: sin `WFAUDIT_TOKEN` el backend solo escucha en localhost y no pide auth. Ver **§23.4** para el modelo de token completo.
 
-# Seguridad (opcional)
-WFAUDIT_API_KEY=tu-clave-secreta    # activar auth
-WFAUDIT_CORS_ORIGINS=http://localhost:5173,http://192.168.1.10:5173
+**2. Ajustes del backend** (`config.py`, vía `pydantic-settings`) — se sobrescriben por entorno o `backend/.env`:
+
+```bash
+HOST=127.0.0.1               # bind del backend (lo fija el script con --host)
+PORT=8000
+REQUIRE_AUTH=false           # true → exige token en cada petición
+API_KEY=change-me            # el token esperado (el script lo iguala a WFAUDIT_TOKEN)
+DATA_DIR=/ruta/a/data        # raíz de capturas, wordlists, informes, evidencias…
 ```
 
 ---
@@ -546,8 +568,8 @@ WFAUDIT_CORS_ORIGINS=http://localhost:5173,http://192.168.1.10:5173
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     FRONTEND (React)                         │
-│              http://localhost:5173                           │
+│              INTERFAZ WEB (HTML/CSS/JS estático)             │
+│              http://localhost:8080                           │
 └─────────────────────┬───────────────────────────────────────┘
                       │ HTTP/JSON
                       ▼
@@ -1381,8 +1403,8 @@ WPA3 es el estándar más reciente (2018) y es significativamente más seguro qu
 
 | Endpoint | Método | Función |
 |---|---|---|
-| `/advanced/wpa3/detect` | POST | Detectar tipo de WPA3 (pure/transition) |
-| `/advanced/wpa3/attack` | POST | Ejecutar ataque contra WPA3 |
+| `/advanced/wpa3/attack` | POST | Ejecutar ataque WPA3 (`attack_type`: `downgrade` · `transition_mode` · `dos`) |
+| `/advanced/wpa3/results` | GET | Resultados de los ataques WPA3 lanzados |
 
 ### 14.3. Modos de WPA3
 
@@ -1431,49 +1453,119 @@ async def attack(self, req: WPA3Request) -> dict:
 
 ---
 
-## 15. Módulo: Recon — Reconocimiento con nmap
+## 15. Módulo: WPS — Pixie-Dust y fuerza bruta de PIN
 
 ### 15.1. Propósito
 
-Una vez dentro de la red (conectado a través del Evil Twin, o con credenciales auditadas), reconocimiento interno: identificar dispositivos, servicios expuestos, vulnerabilidades, OS. Este es el puente entre auditoría WiFi y auditoría de red interna.
+WPS (Wi-Fi Protected Setup) permite a un cliente unirse a la red introduciendo un **PIN de 8 dígitos** (en realidad 7 + un dígito de checksum) en lugar de la passphrase WPA. Ese PIN es el punto débil: si se recupera, el AP entrega la **PSK WPA completa**. Este módulo ataca los APs con WPS activo (el escáner los marca con la etiqueta `WPS`) con dos vectores muy distintos, usando `reaver` o `bully`.
 
 ### 15.2. Endpoints
 
 | Endpoint | Método | Función |
 |---|---|---|
-| `/recon/nmap` | POST | Escaneo nmap con perfil |
-| `/recon/nmap/status` | GET | Estado del escaneo en curso |
-| `/recon/nmap/stop` | POST | Detener escaneo |
-| `/recon/router-probe` | POST | Escaneo rápido del gateway |
-| `/recon/arp-sweep` | POST | Descubrir dispositivos en LAN |
+| `/advanced/wps/start` | POST | Iniciar ataque WPS (Pixie-Dust o fuerza bruta) |
+| `/advanced/wps/stop` | POST | Detener el ataque en curso |
+| `/advanced/wps/status` | GET | Estado en vivo: PIN, PSK, progreso, lockout, log |
 
-### 15.3. Perfiles de nmap
+### 15.3. Vectores de ataque
 
-| Perfil | Flags equivalentes | Duración | Propósito |
+**1. Pixie-Dust** (`attack_type: "pixie"`) — *offline*
+
+Explota la generación débil de los nonces **E-S1 / E-S2** en el intercambio WPS de muchos chipsets (Ralink, Realtek, Broadcom, algunos Atheros). Con capturar el primer intercambio (M1–M3) basta para calcular el PIN mediante `pixiewps`, **sin probar PIN alguno contra el AP**. Cuando el chipset es vulnerable tarda **segundos o minutos**. Es el ataque a probar primero.
+
+```
+reaver -i wlan0mon -b AA:BB:CC:DD:EE:FF -c 6 -K 1 -vv -N
+bully  wlan0mon -b AA:BB:CC:DD:EE:FF -c 6 -d -v 3
+```
+
+**2. Fuerza bruta de PIN** (`attack_type: "bruteforce"`) — *online*
+
+Prueba los PIN contra el AP hasta dar con el correcto. El espacio teórico de 10⁸ se reduce a **~11.000 intentos** gracias al checksum del último dígito y a que el PIN se valida en **dos mitades** (primeros 4 y últimos 3 dígitos por separado). Aun así es **lento** (horas) y ruidoso, y muchos APs aplican **lockout** (bloqueo temporal) tras varios fallos.
+
+```
+reaver -i wlan0mon -b AA:BB:CC:DD:EE:FF -c 6 -vv -N [-L] [-d <seg>]
+```
+
+Al recuperar el PIN (por cualquiera de los dos vectores), reaver/bully continúan y **entregan la PSK WPA** asociada.
+
+### 15.4. Herramientas y flags
+
+| Herramienta | Flag | Significado |
+|---|---|---|
+| `reaver` | `-i <iface>` | Interfaz en modo monitor |
+| `reaver` | `-b <BSSID>` | AP objetivo |
+| `reaver` | `-c <canal>` | Canal del AP (acelera el enganche) |
+| `reaver` | `-K 1` | Ataque Pixie-Dust (offline) |
+| `reaver` | `-L` | Ignora el lockout reportado por el AP |
+| `reaver` | `-d <seg>` | Retardo entre intentos (mitiga el lockout) |
+| `reaver` | `-p <pin>` | Prueba un PIN concreto conocido |
+| `bully` | `-d` | Pixie-Dust (invoca `pixiewps`) |
+| `bully` | `-p <pin>` | Prueba un PIN concreto |
+
+`reaver` y `bully` son paquetes **opcionales** del instalador; si no están, `/advanced/wps/start` devuelve un error claro pidiendo instalarlos.
+
+### 15.5. Implementación (`wps_service.py`)
+
+El ataque corre en **segundo plano** (`asyncio.create_task`) con un `proc_id` registrado para poder cancelarlo, y se sondea vía `/advanced/wps/status`. La salida de reaver/bully se parsea **en vivo** con un callback `on_stdout`:
+
+```python
+_RE_PIN  = re.compile(r"(?:WPS PIN|Pin is)\s*[:=]?\s*['\"]?(\d{4,8})['\"]?", re.I)
+_RE_PSK  = re.compile(r"(?:WPA PSK|key is)\s*[:=]?\s*['\"]([^'\"]+)['\"]", re.I)
+_RE_LOCK = re.compile(r"(rate.?limit|lock(?:ed|out)?|throttl|WPSFAIL)", re.I)
+_RE_TRY  = re.compile(r"[Tt]ry(?:ing)?\s+pin[:\s]*['\"]?(\d+)", re.I)
+```
+
+Detalle importante: el PIN "encontrado" solo se anuncia como `WPS PIN: '...'` (reaver) o `Pin is '...'` (bully). Las líneas `Trying pin '...'` **no** cuentan como hallazgo (solo incrementan el contador de intentos vía `_RE_TRY`), para no dar un falso positivo. El estado expone `pin`, `psk`, `progress` (%), `attempts`, `last_pin`, `locked` y un `log` acotado.
+
+Timeouts: **15 minutos** para Pixie-Dust (es rápido si funciona) y **3 horas** para la fuerza bruta.
+
+### 15.6. Integración con el escáner
+
+Cada AP con WPS activo en el panel **Escaneo WiFi** muestra un botón directo que salta a **Avanzado → WPS** con el BSSID y el canal precargados, igual que el botón de captura de handshake. Así el flujo escaneo → ataque WPS es de un clic.
+
+---
+
+## 16. Módulo: Recon — Reconocimiento con nmap
+
+### 16.1. Propósito
+
+Una vez dentro de la red (conectado a través del Evil Twin, o con credenciales auditadas), reconocimiento interno: identificar dispositivos, servicios expuestos, vulnerabilidades, OS. Este es el puente entre auditoría WiFi y auditoría de red interna.
+
+### 16.2. Endpoints
+
+| Endpoint | Método | Función |
+|---|---|---|
+| `/recon/map` | GET | Obtener el mapa de red persistente (grafo) |
+| `/recon/map` | DELETE | Vaciar el mapa |
+| `/recon/discover` | POST | Descubrir hosts vivos (ARP/ping sweep de un CIDR) |
+| `/recon/scan` | POST | Escaneo nmap de un host (por perfil) |
+| `/recon/host` | POST | Añadir un host manualmente |
+| `/recon/host/{ip}` | PATCH / DELETE | Anotar / eliminar un host |
+| `/recon/legend` | PUT | Editar la leyenda de colores del grafo |
+
+### 16.3. Perfiles de nmap
+
+Tres perfiles por host (`SCAN_PROFILES` en `recon_service.py`):
+
+| Perfil | Flags reales | Duración | Propósito |
 |---|---|---|---|
-| `quick` | `-T4 -F` | <1 min | 100 puertos comunes, rápido |
-| `full` | `-p- -T4` | 5-30 min | 65535 puertos TCP |
-| `vuln` | `--script vuln` | 10-60 min | Scripts NSE de vulnerabilidades |
-| `service` | `-sV -sC` | 3-15 min | Detección de versiones + scripts default |
-| `os_detect` | `-O` | 1-5 min | Detección de OS por fingerprinting |
-| `stealth` | `-sS -T2` | 10-30 min | SYN scan, más lento, más discreto |
-| `udp` | `-sU --top-ports 100` | 20-60 min | UDP scan (lento por naturaleza) |
-| `custom` | flags custom | variable | Flags definidos por el usuario |
+| `stealth` (Silencioso) | `-sS -p- -T4` | 5-30 min | SYN scan a los 65535 puertos, rápido y discreto |
+| `full` (Completo) | `-sS -sV -sC -O -p- --script vuln -T4` | 15-60 min | Puertos + versiones + SO + vulnerabilidades NSE |
+| `udp` (UDP) | `-sU --top-ports 100 -sV -sC -T4` | 20-60 min | Top 100 puertos UDP con versiones |
 
-### 15.4. Request de escaneo
+### 16.4. Request de escaneo
 
 ```json
-POST /recon/nmap
+POST /recon/scan
 {
-  "target": "192.168.1.0/24",      // IP, hostname, rango CIDR o IP range
-  "profile": "service",
-  "ports": null,                    // opcional, solo para custom
-  "extra_args": [],                 // flags adicionales
-  "timeout": 600
+  "ip": "192.168.1.1",
+  "scan_type": "full"          // stealth | full | udp
 }
 ```
 
-### 15.5. Parseo del output XML
+El descubrimiento previo de hosts se lanza con `POST /recon/discover` (`{"cidr": "192.168.1.0/24"}`). Los escaneos corren en segundo plano y el resultado se consulta con `GET /recon/map`.
+
+### 16.5. Parseo del output XML
 
 Nmap soporta output XML (`-oX`) que el servicio parsea con `xml.etree.ElementTree` y lo estructura para fácil consumo:
 
@@ -1513,7 +1605,7 @@ Nmap soporta output XML (`-oX`) que el servicio parsea con `xml.etree.ElementTre
 }
 ```
 
-### 15.6. Router probe (especializado)
+### 16.6. Router probe (especializado)
 
 `/recon/router-probe` es un shortcut para auditar específicamente el gateway:
 - Detecta IP del gateway automáticamente si no se especifica
@@ -1524,13 +1616,13 @@ Nmap soporta output XML (`-oX`) que el servicio parsea con `xml.etree.ElementTre
 
 ---
 
-## 16. Módulo: MITM — Man-in-the-Middle avanzado
+## 17. Módulo: MITM — Man-in-the-Middle avanzado
 
-### 16.1. Propósito
+### 17.1. Propósito
 
 Este es el módulo **más complejo y sofisticado** del backend. Permite interceptar y analizar tráfico de red en tiempo real con dos modos de operación diseñados para diferentes escenarios de auditoría.
 
-### 16.2. Endpoints
+### 17.2. Endpoints
 
 | Endpoint | Método | Función |
 |---|---|---|
@@ -1541,7 +1633,7 @@ Este es el módulo **más complejo y sofisticado** del backend. Permite intercep
 | `/attacks/mitm/ca-cert` | GET | Info del certificado CA + instrucciones |
 | `/attacks/mitm/ca-cert/download/{format}` | GET | Descargar CA (pem, cer, p12) |
 
-### 16.3. Dos modos de operación
+### 17.3. Dos modos de operación
 
 **🔇 MODO STEALTH (default — invisible al target)**
 
@@ -1569,7 +1661,7 @@ Teléfono → Tu máquina → mitmproxy DESCIFRA HTTPS → Internet
 
 Interceptas el contenido completo de HTTPS pero el teléfono mostrará warnings de certificado SSL **salvo que instales la CA de mitmproxy en el dispositivo** (lo que se hace en auditorías reales con consentimiento del cliente).
 
-### 16.4. Arquitectura interna
+### 17.4. Arquitectura interna
 
 **Componentes:**
 
@@ -1610,7 +1702,7 @@ Interceptas el contenido completo de HTTPS pero el teléfono mostrará warnings 
                   └──────────────────┘
 ```
 
-### 16.5. Formato JSONL de los flows
+### 17.5. Formato JSONL de los flows
 
 Cada línea del archivo `mitm_<id>_flows.jsonl` es un JSON con un flow capturado:
 
@@ -1642,7 +1734,7 @@ Para flows de modo Stealth (DNS/TLS) el schema es similar pero:
 - `path` contiene la query/SNI info
 - `is_https` refleja el protocolo real
 
-### 16.6. Detección automática de credenciales
+### 17.6. Detección automática de credenciales
 
 El addon de mitmproxy escanea los request bodies de POSTs buscando palabras clave típicas:
 
@@ -1658,7 +1750,7 @@ if req.method == "POST":
 
 Esto permite destacar en la UI los flows sospechosos de contener credenciales (prioritarios para análisis manual).
 
-### 16.7. Cleanup en `stop`
+### 17.7. Cleanup en `stop`
 
 Crítico para no dejar la red rota:
 
@@ -1677,13 +1769,13 @@ Sin este cleanup, después de parar el MITM la víctima podría quedarse sin int
 
 ---
 
-## 17. Módulo: Captures — Gestión de archivos
+## 18. Módulo: Captures — Gestión de archivos
 
-### 17.1. Propósito
+### 18.1. Propósito
 
 Durante una auditoría se generan decenas de archivos: capturas `.cap`, `.pcap`, `.pcapng`, CSVs, hashes `.22000`, logs `.jsonl`, XML de nmap, etc. Este módulo los centraliza con metadatos ricos.
 
-### 17.2. Endpoints
+### 18.2. Endpoints
 
 | Endpoint | Método | Función |
 |---|---|---|
@@ -1693,7 +1785,7 @@ Durante una auditoría se generan decenas de archivos: capturas `.cap`, `.pcap`,
 | `/captures/{filename}` | DELETE | Eliminar archivo |
 | `/captures/cleanup` | POST | Borrar archivos antiguos |
 
-### 17.3. Tipos de archivo reconocidos
+### 18.3. Tipos de archivo reconocidos
 
 | Extensión | Generado por | Usado para |
 |---|---|---|
@@ -1708,7 +1800,7 @@ Durante una auditoría se generan decenas de archivos: capturas `.cap`, `.pcap`,
 | `.flow` | mitmproxy | Flows binarios mitmproxy |
 | `.txt` | varios | Credenciales, logs |
 
-### 17.4. Metadatos
+### 18.4. Metadatos
 
 Cada archivo devuelve:
 
@@ -1730,7 +1822,7 @@ Cada archivo devuelve:
 }
 ```
 
-### 17.5. Implementación (`capture_service.py`)
+### 18.5. Implementación (`capture_service.py`)
 
 La función clave es `analyze_file()` que según la extensión:
 - Para `.cap`/`.pcap`: corre `aircrack-ng file.cap` y parsea "X handshake"
@@ -1740,13 +1832,13 @@ La función clave es `analyze_file()` que según la extensión:
 
 ---
 
-## 18. Módulo: Sessions — Documentación de auditoría
+## 19. Módulo: Sessions — Documentación de auditoría
 
-### 18.1. Propósito
+### 19.1. Propósito
 
 Agrupar hallazgos de una auditoría bajo una "sesión" con metadatos (cliente, fecha, scope), severidades, y exportación a formato informe.
 
-### 18.2. Endpoints
+### 19.2. Endpoints
 
 | Endpoint | Método | Función |
 |---|---|---|
@@ -1757,7 +1849,7 @@ Agrupar hallazgos de una auditoría bajo una "sesión" con metadatos (cliente, f
 | `/sessions/{id}/export` | GET | Exportar informe JSON |
 | `/sessions/{id}/close` | POST | Cerrar sesión |
 
-### 18.3. Modelo de Finding
+### 19.3. Modelo de Finding
 
 ```json
 {
@@ -1779,7 +1871,7 @@ Agrupar hallazgos de una auditoría bajo una "sesión" con metadatos (cliente, f
 }
 ```
 
-### 18.4. Export de informe
+### 19.4. Export de informe
 
 `/sessions/{id}/export?format=json` devuelve:
 
@@ -1805,7 +1897,7 @@ Agrupar hallazgos de una auditoría bajo una "sesión" con metadatos (cliente, f
 
 ---
 
-## 19. Flujo de trabajo completo paso a paso
+## 20. Flujo de trabajo completo paso a paso
 
 Guía paso a paso de una auditoría típica usando todos los módulos:
 
@@ -1894,8 +1986,8 @@ Asumiendo que se ha obtenido acceso a la red (password crackeada o Evil Twin):
 ```
 17. Conectar wlan0 a la red target con credenciales obtenidas
     
-18. POST /recon/nmap
-    { "target": "192.168.1.0/24", "profile": "service", "timeout": 600 }
+18. POST /recon/discover   { "cidr": "192.168.1.0/24" }
+    POST /recon/scan       { "ip": "192.168.1.1", "scan_type": "full" }
     → Descubrir todos los dispositivos y servicios
     
 19. POST /recon/router-probe
@@ -1941,18 +2033,23 @@ Asumiendo que se ha obtenido acceso a la red (password crackeada o Evil Twin):
 
 ---
 
-## 20. Referencia completa de endpoints
+## 21. Referencia completa de endpoints
 
-Listado exhaustivo de los 62 endpoints del backend.
+Listado exhaustivo de los ~77 endpoints del backend.
 
 ### System
 
 ```
 GET    /system/health
+GET    /system/auth-status
 GET    /system/preflight
 GET    /system/info
 GET    /system/processes
-POST   /system/processes/{id}/kill
+POST   /system/processes/{id}/cancel
+GET    /system/oui/{mac}
+POST   /system/oui/download
+GET    /system/data-usage
+POST   /system/wipe-data
 ```
 
 ### Interfaces
@@ -1992,8 +2089,10 @@ GET    /advanced/apless/status
 POST   /advanced/enterprise/start
 POST   /advanced/enterprise/stop
 GET    /advanced/enterprise/status
-POST   /advanced/wpa3/detect
 POST   /advanced/wpa3/attack
+POST   /advanced/wps/start
+POST   /advanced/wps/stop
+GET    /advanced/wps/status
 ```
 
 ### Attacks
@@ -2012,12 +2111,17 @@ GET    /attacks/mitm/ca-cert/download/{format}
 
 ### Recon
 
+Mapa de red persistente (grafo) con escaneos nmap en segundo plano.
+
 ```
-POST   /recon/nmap
-GET    /recon/nmap/status
-POST   /recon/nmap/stop
-POST   /recon/router-probe
-POST   /recon/arp-sweep
+GET    /recon/map
+DELETE /recon/map
+POST   /recon/discover
+POST   /recon/scan
+POST   /recon/host
+PATCH  /recon/host/{ip}
+DELETE /recon/host/{ip}
+PUT    /recon/legend
 ```
 
 ### Captures
@@ -2028,6 +2132,23 @@ GET    /captures/{filename}
 GET    /captures/{filename}/info
 DELETE /captures/{filename}
 POST   /captures/cleanup
+```
+
+### Wordlists
+
+Generador de diccionarios a medida e importación de diccionarios de SecLists.
+
+```
+GET    /wordlists
+POST   /wordlists/generate
+POST   /wordlists/estimate
+POST   /wordlists/preview
+GET    /wordlists/common-lists
+POST   /wordlists/import-common/{key}
+GET    /wordlists/presets/info
+GET    /wordlists/{filename}/info
+GET    /wordlists/{filename}/download
+DELETE /wordlists/{filename}
 ```
 
 ### Sessions
@@ -2042,17 +2163,17 @@ POST   /sessions/{id}/close
 DELETE /sessions/{id}
 ```
 
-**Total: 62 endpoints**
+**Total: ~77 endpoints**
 
 La documentación interactiva Swagger con schemas completos y posibilidad de probar cada endpoint está disponible en `http://localhost:8000/docs`.
 
 ---
 
-## 21. Modelos de datos (schemas)
+## 22. Modelos de datos (schemas)
 
 Los modelos Pydantic están definidos en `app/models/schemas.py`. Son **50+ schemas** que cubren todos los requests y responses.
 
-### 21.1. Enums principales
+### 22.1. Enums principales
 
 ```python
 class InterfaceMode(str, Enum):
@@ -2092,7 +2213,7 @@ class Severity(str, Enum):
     INFO = "info"
 ```
 
-### 21.2. Requests principales
+### 22.2. Requests principales
 
 **WifiScanRequest:**
 ```python
@@ -2139,7 +2260,7 @@ class NmapRequest(BaseModel):
     timeout: int = 300
 ```
 
-### 21.3. Responses estructurados
+### 22.3. Responses estructurados
 
 Los responses son diccionarios JSON sin validación estricta (retornados como `dict` desde los servicios, no como modelos Pydantic), lo que da flexibilidad para añadir campos sin romper clientes.
 
@@ -2175,9 +2296,9 @@ is_randomized: bool
 
 ---
 
-## 22. Configuración avanzada
+## 23. Configuración avanzada
 
-### 22.1. Ajustes del archivo `config.py`
+### 23.1. Ajustes del archivo `config.py`
 
 El archivo `app/config.py` define la configuración del backend con Pydantic Settings:
 
@@ -2220,7 +2341,7 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-### 22.2. Tuning de rendimiento
+### 23.2. Tuning de rendimiento
 
 **Para escaneos largos**, ajustar el `DEFAULT_SCAN_TIMEOUT` según disponibilidad. Un escaneo de 300s captura ~99% de redes visibles pero es lento si solo quieres reconocimiento rápido.
 
@@ -2228,7 +2349,7 @@ settings = Settings()
 
 **Subprocesos paralelos:** `process_manager.py` permite N procesos concurrentes (por defecto no limita). Si tienes sistema modesto y quieres limitar memoria, añadir `semaphore = asyncio.Semaphore(5)` antes de lanzar subprocesos.
 
-### 22.3. Logging
+### 23.3. Logging
 
 FastAPI usa `logging` estándar de Python. Configuración recomendada para producción en `main.py`:
 
@@ -2250,38 +2371,53 @@ logging.basicConfig(
 )
 ```
 
-### 22.4. Autenticación API
+### 23.4. Autenticación API — modelo por token
 
-Para entornos expuestos en red (no solo localhost), añadir middleware de API key:
+**Seguro por defecto.** Sin configuración, el backend enlaza a `127.0.0.1` (solo localhost) y **no** exige autenticación: solo la propia máquina puede hablar con la API. Es lo recomendado cuando trabajas en tu equipo.
+
+**Exposición en LAN — protegida por token.** Para usar la interfaz desde otro dispositivo, se arranca con la variable `WFAUDIT_TOKEN`:
+
+```bash
+sudo WFAUDIT_TOKEN=$(openssl rand -hex 24) ./wfaudit start
+```
+
+Definir el token hace **dos cosas a la vez**: el script enlaza a `0.0.0.0` (accesible en la red) **y** exporta al backend `REQUIRE_AUTH=true` + `API_KEY=<token>`, de modo que se rechaza con `401` toda petición sin el token correcto. No hay exposición sin token, ni exposición sin protección.
+
+El middleware (`app/main.py`) acepta el token por tres vías y exime solo las rutas mínimas para que el arranque y el login funcionen:
 
 ```python
-# app/main.py
+_AUTH_EXEMPT = ("/system/health", "/system/auth-status", "/docs", "/redoc", "/openapi.json")
+
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if settings.API_KEY:
-        token = request.headers.get("X-API-Key")
+    if (settings.REQUIRE_AUTH
+            and request.method != "OPTIONS"
+            and not request.url.path.startswith(_AUTH_EXEMPT)):
+        auth = request.headers.get("Authorization", "")
+        token = ((auth[7:] if auth.startswith("Bearer ") else "")
+                 or request.headers.get("X-API-Key", "")
+                 or request.query_params.get("token", ""))
         if token != settings.API_KEY:
-            return JSONResponse(
-                {"error": "Unauthorized"}, status_code=401
-            )
+            return JSONResponse(status_code=401, content={"detail": "Token de acceso inválido o ausente"})
     return await call_next(request)
 ```
 
-Luego el frontend debe enviar el header en cada request:
-```js
-fetch("/api/wifi/scan", {
-  headers: {"X-API-Key": "tu-secreto"}
-});
-```
+- **`Authorization: Bearer <token>`** — la vía principal; la interfaz web lo añade automáticamente a cada llamada.
+- **`X-API-Key: <token>`** — cómoda para scripts y `curl`.
+- **`?token=<token>`** — para recursos que van directos al DOM (imágenes de evidencia, PDF, descargas) donde el navegador no puede poner cabeceras.
 
-### 22.5. CORS
+> **Orden de middleware:** la auth se añade **antes** que CORS, así que CORS queda por fuera y hasta una respuesta `401` lleva cabeceras CORS. De lo contrario el navegador vería un error de CORS opaco en vez del 401 y no podría pedir el token.
+
+El frontend consulta `GET /system/auth-status` (exenta) para saber si debe pedir el token, lo guarda en el navegador y lo reenvía en cada petición. La tarjeta **Sistema → Seguridad / Acceso** muestra el estado y permite cambiarlo o cerrar sesión.
+
+### 23.5. CORS
 
 Por defecto el backend acepta CORS de cualquier origen (`*`). Para producción **restringir explícitamente**:
 
 ```python
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,   # ["http://localhost:5173", "http://192.168.1.10:5173"]
+    allow_origins=["http://localhost:8080", "http://192.168.1.10:8080"],   # orígenes de la interfaz web
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -2290,9 +2426,9 @@ app.add_middleware(
 
 ---
 
-## 23. Troubleshooting detallado
+## 24. Troubleshooting detallado
 
-### 23.1. "Operation not permitted" / errores de root
+### 24.1. "Operation not permitted" / errores de root
 
 **Causa:** El backend no está corriendo como root.
 
@@ -2309,7 +2445,7 @@ curl http://localhost:8000/system/health
 # debe devolver "root": true
 ```
 
-### 23.2. "Interface wlan0 not in monitor mode"
+### 24.2. "Interface wlan0 not in monitor mode"
 
 **Causa:** La interfaz está en modo managed.
 
@@ -2325,13 +2461,13 @@ sudo airmon-ng start wlan0
 POST /interfaces/wlan0/monitor
 ```
 
-### 23.3. "Monitor created but no packets captured"
+### 24.3. "Monitor created but no packets captured"
 
 **Causa:** El driver de tu adaptador WiFi no soporta packet capture real o inyección. Muy común con adaptadores integrados (Intel, Broadcom).
 
 **Solución:** Usar un adaptador USB externo con chipset compatible. Ver sección 3.2.
 
-### 23.4. airodump-ng no muestra redes 5 GHz
+### 24.4. airodump-ng no muestra redes 5 GHz
 
 **Causa 1:** Tu adaptador solo soporta 2.4 GHz.
 **Causa 2:** Estás escaneando solo banda "bg".
@@ -2348,7 +2484,7 @@ GET /interfaces/wlan0
 # campo supported_bands debe incluir "5 GHz"
 ```
 
-### 23.5. Handshake no se captura
+### 24.5. Handshake no se captura
 
 **Causa 1:** No hay clientes conectados al AP.
 **Solución:** Usa PMKID en su lugar.
@@ -2362,7 +2498,7 @@ GET /interfaces/wlan0
 **Causa 4:** El cliente tiene roaming agresivo y se cambia a otro canal.
 **Solución:** Verificar el canal del AP, fijar tu adaptador a ese canal con `/interfaces/{name}/channel`.
 
-### 23.6. Cracking encuentra 0 passwords con un buen diccionario
+### 24.6. Cracking encuentra 0 passwords con un buen diccionario
 
 **Causa 1:** El handshake capturado no es completo o está corrupto.
 **Verificar:**
@@ -2377,7 +2513,7 @@ POST /wifi/handshake/verify
 **Causa 3:** Hashcat format incorrecto.
 **Solución:** Para formato modern (2022+) usar modo `22000`, no `2500` (obsoleto).
 
-### 23.7. Evil Twin no aparece en dispositivos cercanos
+### 24.7. Evil Twin no aparece en dispositivos cercanos
 
 **Causa 1:** hostapd falló al arrancar.
 **Verificar logs:** `journalctl -u hostapd` o logs del backend.
@@ -2388,7 +2524,7 @@ POST /wifi/handshake/verify
 **Causa 3:** Interferencia en el canal elegido.
 **Solución:** Cambiar a canal 1, 6 u 11 (2.4 GHz) o 36, 40, 44, 48 (5 GHz).
 
-### 23.8. MITM no captura flows
+### 24.8. MITM no captura flows
 
 **Caso clásico ya resuelto en v5:** mitmproxy crasheaba silenciosamente por opciones incompatibles.
 
@@ -2413,7 +2549,7 @@ sudo iptables -t nat -L -v
 # Debe haber reglas PREROUTING con -j REDIRECT --to-port 8080
 ```
 
-### 23.9. MITM activo pero target no navega
+### 24.9. MITM activo pero target no navega
 
 **Causa:** ARP spoof funciona pero forwarding está roto.
 **Verificar:**
@@ -2430,7 +2566,7 @@ sudo iptables -t nat -L POSTROUTING   # MASQUERADE presente
 
 Si falta algo, reiniciar el MITM.
 
-### 23.10. Stealth MITM no captura DNS/TLS
+### 24.10. Stealth MITM no captura DNS/TLS
 
 **Causa:** tshark no está instalado.
 **Solución:**
@@ -2439,7 +2575,7 @@ sudo apt install tshark
 # Durante instalación, aceptar "Should non-superusers be able to capture packets?" = Yes
 ```
 
-### 23.11. Nmap muy lento
+### 24.11. Nmap muy lento
 
 **Causa:** Perfil `full` escanea 65535 puertos + `-T4` puede ser demasiado rápido para algunas redes.
 
@@ -2448,7 +2584,7 @@ sudo apt install tshark
 - Reducir target: `192.168.1.0/24` en vez de `0.0.0.0/0`
 - Aumentar timeout del request
 
-### 23.12. Procesos zombis tras `stop`
+### 24.12. Procesos zombis tras `stop`
 
 **Síntoma:** Tras hacer stop, `ps aux | grep airodump` o `grep mitmdump` sigue mostrando procesos.
 
@@ -2462,7 +2598,7 @@ Y luego reiniciar el backend limpio.
 
 ---
 
-## 24. Preguntas frecuentes (FAQ)
+## 25. Preguntas frecuentes (FAQ)
 
 **P: ¿Puedo usar WFAudit sin ser root?**
 R: No. Todas las operaciones de auditoría WiFi requieren privilegios root (monitor mode, raw sockets, iptables, modificación de rutas). Usa `sudo`.
@@ -2505,7 +2641,7 @@ En un entorno corporativo con IDS/monitorización, estos signs son detectables.
 
 ---
 
-## 25. Glosario técnico
+## 26. Glosario técnico
 
 **AKM** (Authentication and Key Management) — Suite de autenticación en 802.11 RSN. Ejemplos: PSK, EAP, SAE.
 
@@ -2579,7 +2715,7 @@ En un entorno corporativo con IDS/monitorización, estos signs son detectables.
 
 ---
 
-## 26. Bibliografía y referencias
+## 27. Bibliografía y referencias
 
 ### Especificaciones técnicas (RFCs e IEEE)
 
@@ -2630,7 +2766,7 @@ En un entorno corporativo con IDS/monitorización, estos signs son detectables.
 
 ## Notas finales
 
-Este README ha cubierto el backend de WFAudit en profundidad — desde los fundamentos teóricos de la seguridad WiFi hasta la arquitectura del código, los 62 endpoints, los flujos de trabajo completos, la configuración avanzada y la resolución de problemas.
+Este README ha cubierto el backend de WFAudit en profundidad — desde los fundamentos teóricos de la seguridad WiFi hasta la arquitectura del código, los ~77 endpoints, los flujos de trabajo completos, la configuración avanzada y la resolución de problemas.
 
 **Contribuciones:** Si encuentras un bug, tienes una feature request o quieres contribuir código, abre un issue o PR en el repositorio.
 

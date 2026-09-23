@@ -314,6 +314,37 @@ label .tip,.ctitle .tip{margin-left:5px;}
 .hreqs div.req{font-size:.75rem;color:var(--t1);padding:2px 0;line-height:1.6;}
 .hcode{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--c);background:var(--bg0);padding:1px 6px;border-radius:4px;border:1px solid var(--b0);}
 .hl-a{color:var(--c);font-weight:600;}.hl-w{color:var(--y);font-weight:600;}.hl-d{color:var(--r);font-weight:600;}.hl-i{color:var(--c);font-weight:600;}.hl-g{color:var(--g);font-weight:600;}
+/* Help: "herramientas por detrás" chips + pipeline de comandos */
+.hstack{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0;padding:8px 12px;background:var(--bg0);border:1px solid var(--b0);border-left:2px solid var(--g);border-radius:var(--r);font-size:.72rem;color:var(--t2);}
+.hstack>span{color:var(--t2);font-weight:600;margin-right:2px;}
+.hstack code{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--g);background:var(--g2);padding:2px 8px;border-radius:4px;border:1px solid var(--b1);}
+.hpipe{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:11px 0;padding:10px 13px;background:var(--bg0);border:1px solid var(--b0);border-radius:var(--r);}
+.hpipe-s{font-family:'JetBrains Mono',monospace;font-size:.71rem;color:var(--c);background:var(--c3);padding:4px 10px;border-radius:5px;border:1px solid var(--b1);}
+.hpipe-a{color:var(--t2);font-weight:700;}
+/* ─── Command palette (Ctrl+K) ─── */
+.palbtn{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--b0);border-radius:8px;padding:6px 10px;color:var(--t2);font-size:.74rem;font-family:'Outfit',sans-serif;cursor:pointer;transition:all var(--t);flex-shrink:0;}
+.palbtn:hover{border-color:var(--c);color:var(--c);}
+.palbtn kbd{font-size:.6rem;background:var(--bg0);border:1px solid var(--b1);border-radius:4px;padding:1px 5px;color:var(--t2);font-family:'JetBrains Mono',monospace;}
+.pal-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:13vh 16px 16px;animation:palf .12s ease;}
+@keyframes palf{from{opacity:0}to{opacity:1}}
+.pal-box{width:100%;max-width:560px;background:var(--bg1);border:1px solid var(--b1);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.5);overflow:hidden;animation:pals .14s ease;}
+@keyframes pals{from{transform:translateY(-8px);opacity:.5}to{transform:none;opacity:1}}
+.pal-in-wrap{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--b0);color:var(--t2);}
+.pal-in{flex:1;background:none;border:none;outline:none;color:var(--t0);font-size:.95rem;font-family:'Outfit',sans-serif;}
+.pal-esc{font-size:.6rem;color:var(--t2);border:1px solid var(--b1);border-radius:4px;padding:2px 6px;font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.pal-list{max-height:52vh;overflow-y:auto;padding:6px;}
+.pal-it{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:8px;cursor:pointer;}
+.pal-it.sel{background:var(--c3);}
+.pal-ic{color:var(--t2);display:flex;flex-shrink:0;}
+.pal-it.sel .pal-ic{color:var(--c);}
+.pal-lbl{font-family:'Orbitron',monospace;font-size:.73rem;font-weight:700;letter-spacing:.03em;color:var(--t0);flex-shrink:0;}
+.pal-sub{font-size:.74rem;color:var(--t2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pal-tag{font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--t2);border:1px solid var(--b0);border-radius:4px;padding:2px 6px;opacity:0;flex-shrink:0;}
+.pal-it.sel .pal-tag{opacity:1;color:var(--c);border-color:var(--c);}
+.pal-tag.act{color:var(--y);}
+.pal-it.sel .pal-tag.act{color:var(--y);border-color:var(--y);}
+.pal-empty{padding:26px;text-align:center;color:var(--t2);font-size:.82rem;}
+@media(max-width:680px){.palbtn span{display:none;}.palbtn kbd{display:none;}}
 /* WORDLIST GROUPS */
 .wl-grp{border:1px solid var(--b0);border-radius:var(--r);padding:11px;margin-bottom:10px;background:var(--bg3);}
 .wl-grp-t{font-size:.64rem;color:var(--t2);text-transform:uppercase;letter-spacing:.09em;margin-bottom:8px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:6px;}

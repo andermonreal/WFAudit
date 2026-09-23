@@ -9,7 +9,7 @@ function setToken(t){AUTH_TOKEN=(t||'').trim();try{AUTH_TOKEN?localStorage.setIt
 function authHeaders(){return AUTH_TOKEN?{'Authorization':'Bearer '+AUTH_TOKEN}:{};}
 // Para URLs que van directas al DOM (img/PDF/descargas) y no pueden llevar cabecera → token por query.
 function withTok(u){return AUTH_TOKEN?u+(u.includes('?')?'&':'?')+'token='+encodeURIComponent(AUTH_TOKEN):u;}
-const ST={section:'dashboard',theme:localStorage.getItem('theme')||'dark',activeSession:JSON.parse(localStorage.getItem('activeSession')||'null'),processes:[],apiOk:false,lastScan:JSON.parse(localStorage.getItem('lastScan')||'null')};
+const ST={section:'dashboard',theme:localStorage.getItem('theme')||'dark',activeSession:JSON.parse(localStorage.getItem('activeSession')||'null'),processes:[],apiOk:false,lastScan:JSON.parse(localStorage.getItem('lastScan')||'null'),activeScan:JSON.parse(localStorage.getItem('activeScan')||'null')};
 // ─── Persistencia UNIVERSAL de inputs ───
 // Cualquier <input>/<select>/<textarea> con id dentro de #content se guarda
 // automáticamente al escribir y se restaura al renderizar cualquier pestaña,
@@ -60,6 +60,9 @@ const A={
   entSt:()=>apiFetch('/advanced/enterprise/status'),
   entCreds:()=>apiFetch('/advanced/enterprise/credentials'),
   wpa3:b=>apiFetch('/advanced/wpa3/attack',{method:'POST',body:JSON.stringify(b)}),
+  wpsStart:b=>apiFetch('/advanced/wps/start',{method:'POST',body:JSON.stringify(b)}),
+  wpsStop:()=>apiFetch('/advanced/wps/stop',{method:'POST'}),
+  wpsSt:()=>apiFetch('/advanced/wps/status'),
   etStart:b=>apiFetch('/attacks/evil-twin/start',{method:'POST',body:JSON.stringify(b)}),
   etStop:()=>apiFetch('/attacks/evil-twin/stop',{method:'POST'}),
   etSt:()=>apiFetch('/attacks/evil-twin/status'),
@@ -105,7 +108,9 @@ function toast(msg,type='info',dur=4000){
 function showModal(title,body,footer='',lg=false){document.getElementById('mr').innerHTML=`<div class="mov" onclick="if(event.target===this)closeModal()"><div class="modal${lg?' lg':''}"><div class="mhdr"><span class="mtitle">${title}</span><button class="mclose" onclick="closeModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div><div class="mbody">${body}</div>${footer?`<div class="mfoot">${footer}</div>`:''}</div></div>`;}
 function closeModal(){document.getElementById('mr').innerHTML='';}
 // Escape cierra el overlay superior (primero lightbox, luego modal) — vale para todos los modales
-document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const lb=document.getElementById('lbr');if(lb&&lb.innerHTML){closeLb();return;}const mr=document.getElementById('mr');if(mr&&mr.innerHTML){closeModal();return;}if(document.body.classList.contains('nav-open'))closeSidebar();});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const pal=document.getElementById('pal');if(pal&&pal.innerHTML){closePalette();return;}const lb=document.getElementById('lbr');if(lb&&lb.innerHTML){closeLb();return;}const mr=document.getElementById('mr');if(mr&&mr.innerHTML){closeModal();return;}if(document.body.classList.contains('nav-open'))closeSidebar();});
+// Ctrl/Cmd+K abre (o cierra) la paleta de comandos desde cualquier sitio
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();const p=document.getElementById('pal');(p&&p.innerHTML)?closePalette():openPalette();}});
 let _cdCb=null;
 function confirmDlg(msg,fn,opts){opts=opts||{};_cdCb=fn;showModal(opts.title||'Confirmar',`<div style="display:flex;gap:11px;align-items:flex-start"><span style="color:var(--${opts.danger===false?'c':'y'});flex-shrink:0;margin-top:1px">${ic(opts.danger===false?'info':'warn',20)}</span><div style="color:var(--t1);font-size:.85rem;line-height:1.65">${msg}</div></div>`,`<button class="btn btn-gh" onclick="closeModal()">Cancelar</button><button class="btn ${opts.danger===false?'btn-p':'btn-d'}" onclick="runConfirm()">${opts.ok||'Confirmar'}</button>`);}
 function runConfirm(){const cb=_cdCb;_cdCb=null;closeModal();if(cb)cb();}
@@ -121,6 +126,44 @@ function promptToken(failed){
 }
 function saveTokenFromModal(){const i=document.getElementById('authTok');const v=(i&&i.value||'').trim();if(!v){toast('Introduce el token','warn');return;}setToken(v);_authPrompting=false;closeModal();location.reload();}
 function clearToken(){setToken('');toast('Sesión cerrada','info');setTimeout(()=>location.reload(),400);}
+// ─── Paleta de comandos (Ctrl/Cmd+K): saltar a cualquier sección o lanzar una acción ───
+const PAL_ICONS={dashboard:'cpu',sessions:'folder',interfaces:'wifi',wifiscan:'search',recon:'search',sniffing:'wifi',crack:'key',advanced:'zap',attacks:'shield',captures:'download',wordlists:'terminal',system:'cpu',help:'info'};
+let _palSel=0,_palItems=[];
+function _palData(){
+  const secs=Object.keys(SM).map(k=>({type:'sec',key:k,label:SM[k].t,sub:SM[k].s,icon:PAL_ICONS[k]||'zap',run:()=>goto(k)}));
+  const acts=[
+    {type:'act',key:'tema',label:'CAMBIAR TEMA',sub:'Alternar claro / oscuro',icon:'eye',run:()=>toggleTheme()},
+    {type:'act',key:'recargar refrescar',label:'ACTUALIZAR VISTA',sub:'Recargar la sección actual',icon:'refresh',run:()=>{const fn=window[ST.section];if(typeof fn==='function')fn();}},
+  ];
+  if(ST.activeSession?.id)acts.push({type:'act',key:'sesion',label:'SESIÓN ACTIVA',sub:ST.activeSession.name||ST.activeSession.id,icon:'folder',run:()=>goto('sessions')});
+  return secs.concat(acts);
+}
+function openPalette(){
+  const all=_palData();
+  document.getElementById('pal').innerHTML=`<div class="pal-ov" onclick="if(event.target===this)closePalette()"><div class="pal-box"><div class="pal-in-wrap">${ic('search',15)}<input id="pal-in" class="pal-in" placeholder="Buscar sección o acción…" autocomplete="off" spellcheck="false"><kbd class="pal-esc">Esc</kbd></div><div class="pal-list" id="pal-list"></div></div></div>`;
+  const inp=document.getElementById('pal-in');
+  _palRender(all,'');
+  inp.addEventListener('input',()=>_palRender(all,inp.value));
+  inp.addEventListener('keydown',_palKey);
+  setTimeout(()=>inp.focus(),30);
+}
+function closePalette(){const p=document.getElementById('pal');if(p)p.innerHTML='';}
+function _palRender(all,q){
+  q=(q||'').trim().toLowerCase();
+  _palItems=q?all.filter(it=>(it.label+' '+it.sub+' '+(it.key||'')).toLowerCase().includes(q)):all;
+  _palSel=0;
+  const list=document.getElementById('pal-list');if(!list)return;
+  if(!_palItems.length){list.innerHTML=`<div class="pal-empty">Sin resultados para "${q}"</div>`;return;}
+  list.innerHTML=_palItems.map((it,i)=>`<div class="pal-it${i===0?' sel':''}" onmousemove="_palHover(${i})" onclick="_palGo(${i})"><span class="pal-ic">${ic(it.icon,15)}</span><span class="pal-lbl">${it.label}</span><span class="pal-sub">${it.sub}</span><span class="pal-tag${it.type==='act'?' act':''}">${it.type==='act'?'acción':'ir'}</span></div>`).join('');
+}
+function _palHover(i){_palSel=i;_palPaint();}
+function _palPaint(){document.querySelectorAll('#pal-list .pal-it').forEach((e,i)=>e.classList.toggle('sel',i===_palSel));const s=document.querySelector('#pal-list .pal-it.sel');if(s)s.scrollIntoView({block:'nearest'});}
+function _palKey(e){
+  if(e.key==='ArrowDown'){e.preventDefault();_palSel=Math.min(_palSel+1,_palItems.length-1);_palPaint();}
+  else if(e.key==='ArrowUp'){e.preventDefault();_palSel=Math.max(_palSel-1,0);_palPaint();}
+  else if(e.key==='Enter'){e.preventDefault();_palGo(_palSel);}
+}
+function _palGo(i){const it=_palItems[i];if(!it)return;closePalette();it.run();}
 function setC(h){const c=document.getElementById('content');c.innerHTML=h;restoreInputs(c);}
 function setTB(title,sub,acts=''){document.getElementById('tb-title').textContent=title;document.getElementById('tb-sub').textContent=sub;document.getElementById('tb-acts').innerHTML=acts;}
 const SVG={
@@ -172,6 +215,7 @@ function procLabel(cmd){cmd=(cmd||'').toLowerCase();
   if(cmd.includes('aircrack')||cmd.includes('hashcat'))return 'Crackeo';
   if(cmd.includes('aireplay'))return 'Deauth';
   if(cmd.includes('hcxdumptool'))return 'Captura PMKID';
+  if(cmd.includes('reaver')||cmd.includes('bully'))return 'Ataque WPS';
   if(cmd.includes('arp-scan'))return 'Descubrimiento ARP';
   if(cmd.includes('nmap'))return 'Escaneo nmap';
   if(cmd.includes('hostapd'))return 'Evil Twin';

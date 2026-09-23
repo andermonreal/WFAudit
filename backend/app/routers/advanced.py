@@ -3,11 +3,13 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import (
     PmkidCaptureRequest, PmkidCrackRequest,
     ApLessAttackRequest, EnterpriseAttackRequest, Wpa3AttackRequest,
+    WpsAttackRequest,
 )
 from app.services.pmkid_service import pmkid_service
 from app.services.apless_service import apless_service
 from app.services.enterprise_service import enterprise_service
 from app.services.wpa3_service import wpa3_service
+from app.services.wps_service import wps_service
 
 router = APIRouter(prefix="/advanced", tags=["Advanced Attacks"])
 
@@ -75,3 +77,18 @@ async def wpa3_attack(req: Wpa3AttackRequest):
 @router.get("/wpa3/results")
 async def wpa3_results():
     return wpa3_service.list_results()
+
+# ── WPS (reaver / bully) ──
+
+@router.post("/wps/start")
+async def start_wps(req: WpsAttackRequest):
+    """WPS attack: Pixie-Dust (offline, fast) or PIN brute-force (online, slow) with reaver/bully."""
+    return await wps_service.start(req)
+
+@router.post("/wps/stop")
+async def stop_wps():
+    return await wps_service.stop()
+
+@router.get("/wps/status")
+async def wps_status():
+    return wps_service.status()

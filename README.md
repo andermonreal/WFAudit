@@ -50,9 +50,10 @@ Instead of juggling a dozen terminals and hand-parsing incompatible outputs, you
 ## Highlights
 
 - 🧭 **One API, many tools** — 75+ REST endpoints across 9 modules wrapping the industry-standard wireless toolkit, with auto-generated Swagger docs at `/docs`.
-- 🖥️ **Zero-dependency web UI** — static **HTML/CSS/JS** split into small modules (no build, no `node_modules`) with a built-in 13-section help manual, contextual tooltips and universal input persistence across tabs.
+- 🖥️ **Zero-dependency web UI** — static **HTML/CSS/JS** split into small modules (no build, no `node_modules`) with a built-in 17-section help manual, contextual tooltips, background-job notifications and universal input persistence across tabs.
 - 🚀 **One-command deploy** — `sudo ./wfaudit install` sets up everything; `sudo ./wfaudit start` / `stop` runs and tears it down cleanly.
 - 🧱 **Clean architecture** — three layers (HTTP routers → business services → tool utilities), fully async, easy to extend.
+- 🔐 **Safe by default** — binds to `127.0.0.1` only; opt into LAN access protected by a required access token (`WFAUDIT_TOKEN`). See [Remote / LAN access & hardening](#10-remote--lan-access--hardening).
 - 🔒 **Safe teardown** — `stop` kills residual attack processes and restores `iptables` / IP-forwarding so your machine goes back to normal.
 - 📋 **Engagement tracking** — sessions with severity-rated findings, CVSS, photo evidence, an activity timeline and one-click **PDF / JSON** report export. See [Sessions & reporting](#sessions--reporting).
 
@@ -71,9 +72,10 @@ WFAudit is organized into modules. Each is exposed both in the web UIs and as RE
 | **Evil Twin** | Clone a network with `hostapd` + `dnsmasq`, optional captive portal, internet forwarding and integrated deauth. |
 | **Enterprise (802.1X)** | Rogue RADIUS + Evil Twin to capture EAP credentials (PEAP/EAP-TTLS) and MSCHAP hashes (crackable with `hashcat -m 5500`). |
 | **WPA3** | Detect transition mode, exploit WPA3→WPA2 downgrade, and SAE (Dragonfly) DoS. |
-| **Recon (nmap)** | Internal network reconnaissance: host discovery, ARP sweep, deep service/OS scans, vuln (NSE/CVE) scans and a dedicated **router probe** — 8 scan profiles. |
+| **WPS** | Attack WPS-enabled APs with `reaver`/`bully`: **Pixie-Dust** (offline, seconds/minutes on vulnerable chipsets) or **PIN brute-force** (online), recovering the WPS PIN and the WPA PSK. Live progress, lockout detection, and a one-click launch from any WPS-flagged AP in the scanner. |
+| **Recon (nmap)** | Internal network reconnaissance: host discovery (ARP/ping sweep), gateway-centered **interactive network graph** with an editable colour legend, and 3 per-host `nmap` scan profiles — **Silencioso** (`-sS -p-`), **Completo** (ports + versions + OS + NSE vuln scripts) and **UDP**. |
 | **MITM** | Bidirectional ARP spoofing + `mitmproxy`. **Stealth mode** (DNS + TLS SNI + HTTP, no device warnings) or **Full mode** (HTTPS interception with a downloadable CA). Real-time flow viewer. |
-| **Wordlists** | Build custom dictionaries from seed words: leetspeak, case mutations, number/symbol appendages, year/date formats, word combination and language-targeted presets — with live preview & size estimation. |
+| **Wordlists** | Build custom dictionaries from seed words — leetspeak, case mutations, number/symbol/year appendages (incl. 1900–2050 and `seed+year+symbol` like `cuchara2023!`), accent stripping, 450+ Spanish names, top-N common passwords and word combination — with varied live preview, **exact** size estimation and one-click **SecLists import** (rockyou, xato-net). |
 | **Captures** | Central management of capture files (`.cap`, `.pcap`, `.pcapng`, `.22000`, `.csv`, `.jsonl`) with handshake/PMKID verification. |
 | **Sessions** | Document engagements: severity-rated findings with CVSS, photo evidence and a full activity timeline; active/closed lifecycle (reopen requires a logged reason); exported as a professional **PDF** or structured **JSON** report. See [Sessions & reporting](#sessions--reporting). |
 
@@ -164,11 +166,12 @@ The installer is **idempotent** (safe to re-run) and **distro-aware**. In order,
    |---|---|
    | Python | `python3` `python3-pip` `python3-venv` `python3-dev` |
    | WiFi core | `aircrack-ng` `hcxdumptool` `hcxtools` `hashcat` |
-   | Network | `nmap` `tcpdump` `tshark` |
+   | Network | `nmap` `arp-scan` `tcpdump` `tshark` |
    | Attacks | `hostapd` `dnsmasq` `macchanger` `dsniff` (arpspoof) `arping` `mitmproxy` |
    | System | `iptables` `iproute2` `net-tools` `wireless-tools` `iw` `openssl` `curl` |
    | Build | `build-essential` `libssl-dev` `libffi-dev` |
-   | Optional | `freeradius` `reaver` `bully` `crunch` |
+   | Optional | `freeradius` (Enterprise) · `reaver` `bully` (WPS Pixie-Dust / PIN) · `crunch` |
+   | Dictionaries | `seclists` `wordlists` — huge real-world password lists, importable and crackable from the **Wordlists** panel |
 
    > On Ubuntu 26.04+ (where `wireless-tools` was dropped from the repos) the installer automatically fetches `iwconfig` from the Debian pool, so the WiFi module keeps working.
 
@@ -177,6 +180,7 @@ The installer is **idempotent** (safe to re-run) and **distro-aware**. In order,
    The venv is then `chown`ed back to the invoking user so it stays readable without `sudo`.
 4. **Checks the web UI** — `web/` is static HTML/CSS/JS with no build step or dependencies, so there's nothing to install.
 5. **Generates the mitmproxy CA** used by MITM *Full* mode, at `~/.mitmproxy/` (the invoking user's home).
+6. **Downloads the IEEE OUI database** to `backend/data/oui.txt` for accurate MAC-vendor lookups. If there's no internet it's skipped and can be fetched later from the **System** panel.
 
 When it finishes you'll see `✓ Instalación completa`. If anything is missing later, run [`./wfaudit preflight`](#9-verifying-the-deployment).
 
@@ -191,9 +195,10 @@ sudo ./wfaudit start
 | Service | Command | Runs as | Port | Working dir | Log | PID file |
 |---|---|:---:|:---:|---|---|---|
 | **Backend** (FastAPI) | `.venv/bin/uvicorn app.main:app --host $WFAUDIT_HOST --port $WFAUDIT_PORT` | **root** | `8000` | `backend/` | `logs/backend.log` | `.pids/backend.pid` |
-| **Web UI** (static) | `python3 -m http.server $WFAUDIT_FRONTEND_PORT --bind 0.0.0.0` | `$SUDO_USER` | `8080` | `web/` | `logs/frontend.log` | `.pids/frontend.pid` |
+| **Web UI** (static) | `python3 -m http.server $WFAUDIT_FRONTEND_PORT --bind $WFAUDIT_FRONTEND_HOST` | `$SUDO_USER` | `8080` | `web/` | `logs/frontend.log` | `.pids/frontend.pid` |
 
 - The backend is the only service that needs root; the web UI is dropped to your normal user.
+- **Both services bind to `127.0.0.1` by default** (localhost only, no auth). Set `WFAUDIT_TOKEN` to expose them on the LAN protected by a token — see [§10](#10-remote--lan-access--hardening).
 - `start` refuses to run if a backend PID is already active — use `stop` (or `restart`) first.
 - The web UI serves `web/index.html` at the root path, so `http://localhost:8080/` loads it directly.
 
@@ -219,16 +224,21 @@ Override any of these on the command line before the script:
 
 | Variable | Default | Description |
 |---|---|---|
-| `WFAUDIT_HOST` | `0.0.0.0` | Backend bind host |
+| `WFAUDIT_TOKEN` | *(unset)* | Access token. **If set**, WFAudit binds to `0.0.0.0` (LAN-reachable) **and requires this token** on every request. **If unset**, it stays on `127.0.0.1` with no auth. See [§10](#10-remote--lan-access--hardening). |
+| `WFAUDIT_HOST` | `127.0.0.1` (or `0.0.0.0` when a token is set) | Force the backend bind host explicitly |
+| `WFAUDIT_FRONTEND_HOST` | *(same as `WFAUDIT_HOST`)* | Force the web-UI bind host explicitly |
 | `WFAUDIT_PORT` | `8000` | Backend (FastAPI) port |
 | `WFAUDIT_FRONTEND_PORT` | `8080` | Web-UI port (static HTML server) |
 
 ```bash
 # Example: custom ports
 WFAUDIT_PORT=9000 WFAUDIT_FRONTEND_PORT=3000 sudo ./wfaudit start
+
+# Example: expose on the LAN, protected by a token
+sudo WFAUDIT_TOKEN=$(openssl rand -hex 24) ./wfaudit start
 ```
 
-> ℹ️ If you change `WFAUDIT_PORT`, the web UI still expects the backend at `http://localhost:8000`. Point the HTML console's `API` constant at your custom host\:port, or reverse-proxy `:8000` accordingly.
+> ℹ️ The web UI reaches the backend on port **8000 of the same host it was loaded from**, so LAN access works with no changes. If you change `WFAUDIT_PORT`, update the `API` constant in `web/js/core.js` (or reverse-proxy `:8000`) accordingly.
 
 The **backend** itself reads settings from `backend/app/config.py` (via `pydantic-settings`), which also accepts an optional `backend/.env` file. Notable settings include the data directories (below) — override e.g. `REPORTS_DIR=/path` as an environment variable if you want captures/reports stored elsewhere.
 
@@ -269,15 +279,26 @@ curl localhost:8000/system/health      # {"status":"ok"} when the API is up
 curl localhost:8000/system/preflight   # detailed JSON: tools, root, system info
 ```
 
-`preflight` checks: `aircrack-ng` `airodump-ng` `aireplay-ng` `airmon-ng` `hcxdumptool` `hcxpcapngtool` `hashcat` `nmap` `hostapd` `dnsmasq` `macchanger` `arpspoof` `mitmdump` `tshark` `tcpdump` `iptables` `iw`. A missing tool silently disables the module that needs it, so run this first.
+`preflight` checks: `aircrack-ng` `airodump-ng` `aireplay-ng` `airmon-ng` `hcxdumptool` `hcxpcapngtool` `hashcat` `nmap` `hostapd` `dnsmasq` `macchanger` `arpspoof` `mitmdump` `tshark` `tcpdump` `reaver` `bully` `iptables` `iw`. A missing tool silently disables the module that needs it, so run this first.
 
 ### 10. Remote / LAN access & hardening
 
-By default every service binds to `0.0.0.0`, so **it is reachable from your whole LAN**, and the API is unauthenticated. That's convenient on an isolated lab network but risky elsewhere. For anything but a trusted local setup:
+**Safe by default.** With no configuration, both services bind to **`127.0.0.1`** — WFAudit is reachable only from the machine it runs on and needs no password. This is the recommended setup when you work on your own box.
 
-- Bind the backend to localhost only: `WFAUDIT_HOST=127.0.0.1 sudo ./wfaudit start`, and reach the UI over an SSH tunnel (`ssh -L 8080:localhost:8080 -L 8000:localhost:8000 …`).
-- Or firewall ports `8000` and `8080` to trusted hosts.
-- Never expose WFAudit directly to the internet — it drives offensive tooling as root with no auth.
+**Exposing it to the LAN — protected by a token.** To reach the UI from another device (a phone, a second laptop on the same network), start it with a token:
+
+```bash
+sudo WFAUDIT_TOKEN=$(openssl rand -hex 24) ./wfaudit start
+```
+
+Setting `WFAUDIT_TOKEN` does two things at once: it **binds to `0.0.0.0`** (LAN-reachable) *and* **turns on authentication** — the backend answers `401` to every request without the correct token. There is no exposure without a token, and no exposure without protection.
+
+- **How the token travels** — the web UI sends it automatically as `Authorization: Bearer <token>`; scripts can use that or an `X-API-Key` header; resources loaded straight into the DOM (evidence images, the PDF, wordlist/CA downloads) use a `?token=` query param.
+- **In the UI** — opening the console against a protected backend prompts for the token once, stores it in the browser and reuses it. The **System → Seguridad / Acceso** card shows the auth state and lets you change the token or log out.
+- **Unauthenticated routes** — only `/system/health`, `/system/auth-status` and `/docs` are exempt, so the health check and the login prompt work before you hold a token.
+- **Pick a strong token** — anyone on the network who has it gets full control of the root backend. Use a long random value (`openssl rand -hex 24`) and only expose it on a trusted network.
+- **Alternative** — keep the default localhost bind and reach the UI over an SSH tunnel: `ssh -L 8080:localhost:8080 -L 8000:localhost:8000 user@host`.
+- **Never expose WFAudit directly to the internet** — even with a token, it drives offensive tooling as root.
 
 ---
 
@@ -287,7 +308,7 @@ Once running you get two entry points:
 
 | URL | What |
 |---|---|
-| `http://localhost:8080/` | **Web UI** — the static web console: all modules, a built-in 13-section help manual, contextual tooltips, universal input persistence and a full wordlist generator. |
+| `http://localhost:8080/` | **Web UI** — the static web console: all modules, a built-in 17-section help manual, contextual tooltips, universal input persistence and a full wordlist generator. |
 | `http://localhost:8000/docs` | **Swagger API docs** — interactive REST reference; drive WFAudit from any HTTP client or script. |
 
 ## Your first audit
@@ -391,7 +412,7 @@ WFAudit/
 - **[backend/README.md](backend/README.md)** — exhaustive documentation (Spanish): WiFi security fundamentals, every module explained in depth, workflows and a glossary.
 - **[backend/API_REFERENCE.md](backend/API_REFERENCE.md)** — complete REST endpoint reference.
 - **Swagger UI** — live interactive docs at `http://localhost:8000/docs` while the backend is running.
-- **In-app Help** — the web UI ships a 13-section manual (overview, workflow, every panel, tips) accessible from its sidebar.
+- **In-app Help** — the web UI ships a 17-section manual (overview, install, security, workflow, every panel, wordlists, tips, glossary) accessible from its sidebar.
 
 ## Troubleshooting
 
